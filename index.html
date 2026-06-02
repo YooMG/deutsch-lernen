@@ -356,7 +356,7 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .stagger>*{animation:fade .4s ease backwards}
 
 /* ════════ AUTH OVERLAY ════════ */
-#authOverlay{position:fixed;inset:0;background:var(--paper);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;transition:opacity .3s}
+#authOverlay{position:fixed;inset:0;background:var(--paper);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;transition:opacity .35s}
 #authOverlay.hiding{opacity:0;pointer-events:none}
 .auth-card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:40px 32px 36px;max-width:380px;width:90%;text-align:center;box-shadow:var(--shadow-lg)}
 .auth-logo{font-size:48px;margin-bottom:16px}
@@ -2608,15 +2608,178 @@ function lueckeCheck(){
 /* init */
 applyTheme();render();
 </script>
-<!-- Firebase module (loads auth + firestore) -->
-<script type="module" src="firebase-app.js"></script>
-
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js')
       .then(r=>console.log('SW registered'))
       .catch(e=>console.log('SW error',e));
+  });
+}
+</script>
+
+<!-- Firebase Auth + Firestore — inline module -->
+<script type="module">
+import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
+                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
+                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ─── REPLACE WITH YOUR FIREBASE CONFIG ───
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+// ─────────────────────────────────────────
+
+const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+
+function showOverlay() {
+  const o = document.getElementById('authOverlay');
+  const l = document.getElementById('authLoading');
+  if (o) { o.style.display = 'flex'; o.style.opacity = '1'; }
+  if (l) l.style.display = 'none';
+}
+function hideOverlay() {
+  const o = document.getElementById('authOverlay');
+  if (!o) return;
+  o.style.opacity = '0';
+  o.style.transition = 'opacity .35s';
+  setTimeout(() => { o.style.display = 'none'; }, 370);
+}
+function setUser(user) {
+  const wrap  = document.getElementById('userAvatarWrap');
+  const img   = document.getElementById('userAvatar');
+  const name  = document.getElementById('userName');
+  const email = document.getElementById('userEmail');
+  if (!wrap) return;
+  if (user) {
+    wrap.style.display = 'block';
+    if (img)   img.src            = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'U') + '&background=2f7d8a&color=fff&size=64';
+    if (name)  name.textContent   = user.displayName || 'مستخدم';
+    if (email) email.textContent  = user.email || '';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+if (!isConfigured) {
+  // No config — hide overlay, run without auth
+  const o = document.getElementById('authOverlay');
+  if (o) o.style.display = 'none';
+  console.warn('Firebase not configured — running without auth');
+} else {
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  const SYNC_KEYS = [
+    'wortschatz_known_v1','verben_known_v1','wortschatz_custom_v1',
+    'verben_custom_v1','wortschatz_custom_cats_v1','dt_tasks_v3','dt_level','deutsch_theme'
+  ];
+
+  function buildSnapshot() {
+    const snap = {};
+    SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) snap[k] = v; });
+    return snap;
+  }
+  function applySnapshot(snap) {
+    if (!snap) return;
+    SYNC_KEYS.forEach(k => { if (snap[k] !== undefined) try { localStorage.setItem(k, snap[k]); } catch(e){} });
+  }
+
+  let _syncUid = null;
+
+  async function uploadProgress(uid) {
+    try {
+      await setDoc(doc(db,'users',uid), { ...buildSnapshot(), updatedAt: serverTimestamp() }, { merge: true });
+      const b = document.getElementById('syncBadge');
+      if (b) { b.style.display='inline'; b.textContent='✓ متزامن'; }
+    } catch(e) { console.warn('Sync upload failed:', e); }
+  }
+
+  async function downloadProgress(uid) {
+    try {
+      const snap = await getDoc(doc(db,'users',uid));
+      if (snap.exists()) {
+        const localTheme = localStorage.getItem('deutsch_theme');
+        applySnapshot(snap.data());
+        if (localTheme) localStorage.setItem('deutsch_theme', localTheme);
+      }
+    } catch(e) { console.warn('Sync download failed:', e); }
+  }
+
+  // Patch localStorage to auto-sync 2s after any save
+  const _orig = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(key, value) {
+    _orig(key, value);
+    if (_syncUid && SYNC_KEYS.includes(key)) {
+      clearTimeout(localStorage._t);
+      localStorage._t = setTimeout(() => uploadProgress(_syncUid), 2000);
+    }
+  };
+
+  // Show overlay immediately while checking auth state
+  showOverlay();
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      setUser(user);
+      await downloadProgress(user.uid);
+      _syncUid = user.uid;
+      if (typeof applyTheme === 'function') applyTheme();
+      if (typeof render    === 'function') render();
+      hideOverlay();
+      setInterval(() => uploadProgress(user.uid), 3 * 60 * 1000);
+    } else {
+      _syncUid = null;
+      setUser(null);
+      showOverlay();
+    }
+  });
+
+  window.authSignIn = async () => {
+    const err = document.getElementById('authErr');
+    if (err) err.style.display = 'none';
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch(e) {
+      if (err) { err.style.display='block'; err.textContent = 'خطأ: ' + (e.message || 'حاول مجدداً'); }
+    }
+  };
+
+  window.authSignOut = async () => {
+    if (!confirm('تسجيل الخروج؟')) return;
+    if (_syncUid) await uploadProgress(_syncUid);
+    _syncUid = null;
+    await signOut(auth);
+    const m = document.getElementById('userMenu');
+    if (m) m.classList.remove('open');
+  };
+
+  window.syncNow = async () => {
+    if (!_syncUid) return;
+    const b = document.getElementById('syncBadge');
+    if (b) { b.style.display='inline'; b.textContent='⏳'; }
+    await uploadProgress(_syncUid);
+  };
+
+  window.toggleUserMenu = () => {
+    const m = document.getElementById('userMenu');
+    if (m) m.classList.toggle('open');
+  };
+
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('userAvatarWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      const m = document.getElementById('userMenu');
+      if (m) m.classList.remove('open');
+    }
   });
 }
 </script>
