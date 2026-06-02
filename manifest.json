@@ -1,0 +1,52 @@
+{
+  "name": "Deutsch Lernen · منصة تعلّم الألمانية",
+  "short_name": "Deutsch Lernen",
+  "description": "تعلّم الألمانية — مفردات، أفعال، مهام يومية، استماع وكتابة",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5efe3",
+  "theme_color": "#2f7d8a",
+  "lang": "ar",
+  "dir": "rtl",
+  "scope": "./",
+  "categories": ["education", "language"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "المفردات",
+      "short_name": "Wörter",
+      "description": "اختبر مفرداتك الألمانية",
+      "url": "./?view=words",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "الأفعال",
+      "short_name": "Verben",
+      "description": "تدرّب على الأفعال الألمانية",
+      "url": "./?view=verbs",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "المهام اليومية",
+      "short_name": "Aufgaben",
+      "description": "مهامك اليومية",
+      "url": "./?view=tasks",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
