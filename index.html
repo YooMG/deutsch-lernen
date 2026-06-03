@@ -2745,9 +2745,13 @@ function showOverlay() {
 function hideOverlay() {
   const o = document.getElementById('authOverlay');
   if (!o) return;
+  o.style.transition = 'opacity .3s';
   o.style.opacity = '0';
-  o.style.transition = 'opacity .35s';
-  setTimeout(() => { o.style.display = 'none'; }, 370);
+  setTimeout(() => {
+    o.style.display = 'none';
+    o.style.opacity = '1';
+    o.style.transition = '';
+  }, 320);
 }
 function setUser(user) {
   const wrap  = document.getElementById('userAvatarWrap');
@@ -2836,9 +2840,12 @@ if (!isConfigured) {
       setUser(user);
       await downloadProgress(user.uid);
       _syncUid = user.uid;
-      if (typeof applyTheme === 'function') applyTheme();
-      if (typeof render    === 'function') render();
+      // hide overlay first so the app is visible
       hideOverlay();
+      // then render the home page
+      if (typeof applyTheme === 'function') applyTheme();
+      if (typeof setView   === 'function') setView('home');
+      else if (typeof render === 'function') render();
       setInterval(() => uploadProgress(user.uid), 3 * 60 * 1000);
     } else {
       _syncUid = null;
