@@ -672,6 +672,7 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
       <button data-view="tasks">📅 المهام اليومية</button>
       <button data-view="horen">🎧 Hören</button>
       <button data-view="schreiben">✍️ Schreiben</button>
+      <button data-view="profile" id="profileNavBtn" style="display:none">👤 ملفّي</button>
     </nav>
     <div class="h-right" style="position:relative">
         <div id="userAvatarWrap" style="display:none;position:relative">
@@ -825,6 +826,7 @@ function render(){
   if(view==='tasks')return renderTasks();
   if(view==='horen')return renderHoren();
   if(view==='schreiben')return renderSchreiben();
+  if(view==='profile')return renderProfile();
   return renderVerbs();
 }
 
@@ -2605,6 +2607,101 @@ function lueckeCheck(){
   lueckeRender();
 }
 
+/* ════════ PROFILE PAGE ════════ */
+function renderProfile(){
+  const user = window._currentUser;
+  if(!user){ setView('home'); return; }
+
+  const joined = user.metadata?.creationTime
+    ? new Date(user.metadata.creationTime).toLocaleDateString('ar-SA',{year:'numeric',month:'long',day:'numeric'})
+    : '—';
+
+  const totalW = Object.keys(wKnown).length;
+  const totalV = Object.keys(vKnown).length;
+  const totalProgress = Math.round((totalW+totalV)/(WTOTAL+VTOTAL)*100);
+
+  const levelColors = {A1:'#9b59b6',A2:'#1D9E75',B1:'#7F77DD',B2:'#D85A30',C1:'#c0392b'};
+  const currentLvl = localStorage.getItem('dt_level')||'B1';
+  const lvlColor = levelColors[currentLvl]||'var(--teal)';
+
+  app.innerHTML=`<div class="fade" style="max-width:640px;margin:0 auto;padding:12px 0 60px">
+
+    <!-- Hero card -->
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:24px;padding:28px 24px;margin-bottom:16px;text-align:center;box-shadow:var(--shadow)">
+      <img src="${esc(user.photoURL||'https://ui-avatars.com/api/?name='+encodeURIComponent(user.displayName||'U')+'&background=2f7d8a&color=fff&size=128')}"
+           style="width:80px;height:80px;border-radius:50%;border:3px solid var(--teal);margin-bottom:14px;display:block;margin-inline:auto">
+      <h2 style="font-size:20px;font-weight:800;color:var(--ink);margin-bottom:4px">${esc(user.displayName||'مستخدم')}</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin-bottom:16px">${esc(user.email||'')}</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <span style="background:${lvlColor};color:#fff;padding:4px 14px;border-radius:8px;font-size:13px;font-weight:800">${currentLvl}</span>
+        <span style="background:var(--paper-2);color:var(--ink-soft);padding:4px 14px;border-radius:8px;font-size:12px">عضو منذ ${joined}</span>
+      </div>
+    </div>
+
+    <!-- Stats grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
+        <div style="font-size:26px;font-weight:800;color:var(--teal)">${totalW}</div>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px">كلمة متقنة</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
+        <div style="font-size:26px;font-weight:800;color:var(--green)">${totalV}</div>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px">فعل متقن</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
+        <div style="font-size:26px;font-weight:800;color:var(--amber)">${totalProgress}%</div>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px">تقدّم إجمالي</div>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:700;color:var(--ink)">التقدّم الكلي</span>
+        <span style="font-size:13px;font-weight:700;color:var(--teal)">${totalW+totalV} / ${WTOTAL+VTOTAL}</span>
+      </div>
+      <div style="background:var(--paper-2);border-radius:99px;height:8px;overflow:hidden">
+        <div style="width:${totalProgress}%;background:linear-gradient(90deg,var(--teal),var(--blue));height:100%;border-radius:99px;transition:width .4s"></div>
+      </div>
+    </div>
+
+    <!-- Custom vocabulary groups -->
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)">
+      <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px">📂 مجموعاتي المخصصة (${wCustomCats.length})</div>
+      ${wCustomCats.length===0
+        ? `<p style="font-size:13px;color:var(--ink-soft)">لم تنشئ أي مجموعة بعد — اذهب لقسم المفردات لإنشاء مجموعة</p>`
+        : wCustomCats.map(cat=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+            <span style="font-size:20px">${esc(cat.icon||'📂')}</span>
+            <div>
+              <div style="font-size:13.5px;font-weight:700;color:var(--ink)">${esc(cat.ar)}</div>
+              <div style="font-size:12px;color:var(--ink-soft)" class="de">${esc(cat.de)}</div>
+            </div>
+            <span style="margin-inline-start:auto;font-size:12px;color:var(--teal);font-weight:700">${cat.items?.length||0} كلمة</span>
+          </div>`).join('')
+      }
+    </div>
+
+    <!-- Actions -->
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 20px;box-shadow:var(--shadow)">
+      <div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px">⚙️ إعدادات الحساب</div>
+      <button onclick="window.syncNow&&window.syncNow();this.textContent='✓ تمت المزامنة!';setTimeout(()=>this.textContent='🔄 مزامنة التقدم الآن',2000)"
+        style="display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;background:var(--paper-2);border:1px solid var(--line);border-radius:12px;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit;margin-bottom:8px;text-align:start;transition:.15s">
+        🔄 مزامنة التقدم الآن
+      </button>
+      <button onclick="if(confirm('تصفير كل التقدم؟')){wKnown={};vKnown={};saveW();saveV();render()}"
+        style="display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);border-radius:12px;font-size:13.5px;font-weight:700;color:#c0392b;cursor:pointer;font-family:inherit;margin-bottom:8px;text-align:start">
+        🗑️ تصفير كل التقدم
+      </button>
+      <button onclick="window.authSignOut&&window.authSignOut()"
+        style="display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;background:var(--paper-2);border:1px solid var(--line);border-radius:12px;font-size:13.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;font-family:inherit;text-align:start">
+        🚪 تسجيل الخروج
+      </button>
+    </div>
+
+  </div>`;
+}
+
 /* init */
 applyTheme();render();
 </script>
@@ -2657,14 +2754,19 @@ function setUser(user) {
   const img   = document.getElementById('userAvatar');
   const name  = document.getElementById('userName');
   const email = document.getElementById('userEmail');
+  const profileBtn = document.getElementById('profileNavBtn');
   if (!wrap) return;
   if (user) {
     wrap.style.display = 'block';
-    if (img)   img.src            = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'U') + '&background=2f7d8a&color=fff&size=64';
-    if (name)  name.textContent   = user.displayName || 'مستخدم';
-    if (email) email.textContent  = user.email || '';
+    if (img)        img.src            = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'U') + '&background=2f7d8a&color=fff&size=64';
+    if (name)       name.textContent   = user.displayName || 'مستخدم';
+    if (email)      email.textContent  = user.email || '';
+    if (profileBtn) profileBtn.style.display = 'block';
+    window._currentUser = user;
   } else {
     wrap.style.display = 'none';
+    if (profileBtn) profileBtn.style.display = 'none';
+    window._currentUser = null;
   }
 }
 
@@ -2724,21 +2826,12 @@ if (!isConfigured) {
     }
   };
 
-  // Handle redirect result first (when returning from Google redirect)
+  // Show overlay while Firebase checks auth state
   showOverlay();
-  try {
-    const result = await getRedirectResult(auth);
-    if (result && result.user) {
-      // User just came back from redirect - auth state will handle the rest
-      console.log('Redirect sign-in successful:', result.user.email);
-    }
-  } catch(e) {
-    console.warn('Redirect result error:', e);
-    const err = document.getElementById('authErr');
-    if (err) { err.style.display='block'; err.textContent = 'خطأ في تسجيل الدخول: ' + (e.message||''); }
-  }
+  let _authResolved = false;
 
   onAuthStateChanged(auth, async (user) => {
+    _authResolved = true;
     if (user) {
       setUser(user);
       await downloadProgress(user.uid);
@@ -2758,12 +2851,15 @@ if (!isConfigured) {
     const err = document.getElementById('authErr');
     if (err) err.style.display = 'none';
     const btn = document.querySelector('.auth-google-btn');
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.textContent = 'جارٍ التوجيه...'; }
+    if (btn) { btn.disabled=true; btn.style.opacity='0.7'; }
     try {
-      await signInWithRedirect(auth, new GoogleAuthProvider());
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(auth, provider);
     } catch(e) {
-      if (err) { err.style.display='block'; err.textContent = 'خطأ: ' + (e.message || 'حاول مجدداً'); }
-      if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'تسجيل الدخول بـ Google'; }
+      console.error('Sign-in error:', e);
+      if (err) { err.style.display='block'; err.textContent='خطأ: '+(e.message||'حاول مجدداً'); }
+      if (btn) { btn.disabled=false; btn.style.opacity='1'; }
     }
   };
 
