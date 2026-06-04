@@ -2783,12 +2783,13 @@ if (!isConfigured) {
   if (o) o.style.display = 'none';
   console.warn('Firebase not configured — running without auth');
 } else {
+  (async () => {
   const app  = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db   = getFirestore(app);
 
   // Force session to persist in localStorage across browser sessions
-  await setPersistence(auth, browserLocalStoragePersistence);
+  try { await setPersistence(auth, browserLocalStoragePersistence); } catch(e) { console.warn('Persistence error:', e); }
 
   const SYNC_KEYS = [
     'wortschatz_known_v1','verben_known_v1','wortschatz_custom_v1',
@@ -2904,6 +2905,7 @@ if (!isConfigured) {
       if (m) m.classList.remove('open');
     }
   });
+  })();
 }
 </script>
 </body>
