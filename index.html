@@ -2715,15 +2715,14 @@ if('serviceWorker' in navigator){
 }
 </script>
 
-<!-- Firebase Auth + Firestore — inline module -->
+<!-- Firebase Auth + Firestore -->
 <script type="module">
 import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, setPersistence, browserLocalStoragePersistence }
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, setPersistence, browserLocalStoragePersistence }
                                  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
                                  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// ─── REPLACE WITH YOUR FIREBASE CONFIG ───
 const firebaseConfig = {
   apiKey:            "AIzaSyBQk2i8GNKbuk1gh2wY1kYKBayZ4WaC74A",
   authDomain:        "deutsch-lernen-e8378.firebaseapp.com",
@@ -2732,181 +2731,152 @@ const firebaseConfig = {
   messagingSenderId: "433288128367",
   appId:             "1:433288128367:web:6fdeac64188b332d58ea9a"
 };
-// ─────────────────────────────────────────
 
-const isConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY";
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
-function showOverlay() {
-  const o = document.getElementById('authOverlay');
-  const sub = document.getElementById('authSubtitle');
+// ── Persistence: keep session across browser restarts ──
+setPersistence(auth, browserLocalStoragePersistence).catch(e => console.warn('Persistence:', e));
+
+// ── UI helpers ──
+function showLoginScreen() {
+  const overlay = document.getElementById('authOverlay');
+  const subtitle = document.getElementById('authSubtitle');
   const btn = document.querySelector('.auth-google-btn');
-  if (o) { o.style.display = 'flex'; o.style.opacity = '1'; }
-  // Show real login content
-  if (sub) sub.textContent = 'منصة تعلّم الألمانية — سجّل دخولك لحفظ تقدّمك على كل أجهزتك';
+  if (overlay) { overlay.style.display = 'flex'; overlay.style.opacity = '1'; }
+  if (subtitle) subtitle.textContent = 'سجّل دخولك لحفظ تقدّمك على كل أجهزتك';
   if (btn) btn.style.display = 'flex';
 }
-function hideOverlay() {
-  const o = document.getElementById('authOverlay');
-  if (!o) return;
-  o.style.transition = 'opacity .3s';
-  o.style.opacity = '0';
-  setTimeout(() => {
-    o.style.display = 'none';
-    o.style.opacity = '1';
-    o.style.transition = '';
-  }, 320);
+
+function hideLoginScreen() {
+  const overlay = document.getElementById('authOverlay');
+  if (!overlay) return;
+  overlay.style.transition = 'opacity 0.3s';
+  overlay.style.opacity = '0';
+  setTimeout(() => { overlay.style.display = 'none'; overlay.style.opacity = '1'; overlay.style.transition = ''; }, 320);
 }
-function setUser(user) {
+
+function updateUserUI(user) {
   const wrap  = document.getElementById('userAvatarWrap');
   const img   = document.getElementById('userAvatar');
   const name  = document.getElementById('userName');
   const email = document.getElementById('userEmail');
   const profileBtn = document.getElementById('profileNavBtn');
-  if (!wrap) return;
+  window._currentUser = user;
   if (user) {
-    wrap.style.display = 'block';
-    if (img)        img.src            = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || 'U') + '&background=2f7d8a&color=fff&size=64';
-    if (name)       name.textContent   = user.displayName || 'مستخدم';
-    if (email)      email.textContent  = user.email || '';
+    if (wrap)  wrap.style.display  = 'block';
+    if (img)   img.src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName||'U') + '&background=2f7d8a&color=fff&size=64';
+    if (name)  name.textContent  = user.displayName || 'مستخدم';
+    if (email) email.textContent = user.email || '';
     if (profileBtn) profileBtn.style.display = 'block';
-    window._currentUser = user;
   } else {
-    wrap.style.display = 'none';
+    if (wrap)  wrap.style.display  = 'none';
     if (profileBtn) profileBtn.style.display = 'none';
-    window._currentUser = null;
   }
 }
 
-if (!isConfigured) {
-  // No config — hide overlay, run without auth
-  const o = document.getElementById('authOverlay');
-  if (o) o.style.display = 'none';
-  console.warn('Firebase not configured — running without auth');
-} else {
-  (async () => {
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
+// ── Sync keys ──
+const KEYS = ['wortschatz_known_v1','verben_known_v1','wortschatz_custom_v1',
+              'verben_custom_v1','wortschatz_custom_cats_v1','dt_tasks_v3','dt_level','deutsch_theme'];
 
-  // Force session to persist in localStorage across browser sessions
-  try { await setPersistence(auth, browserLocalStoragePersistence); } catch(e) { console.warn('Persistence error:', e); }
+function getSnapshot() {
+  const o = {};
+  KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) o[k] = v; });
+  return o;
+}
+function applySnapshot(data) {
+  if (!data) return;
+  const theme = localStorage.getItem('deutsch_theme');
+  KEYS.forEach(k => { if (data[k] != null) try { localStorage.setItem(k, data[k]); } catch(e){} });
+  if (theme) localStorage.setItem('deutsch_theme', theme);
+}
 
-  const SYNC_KEYS = [
-    'wortschatz_known_v1','verben_known_v1','wortschatz_custom_v1',
-    'verben_custom_v1','wortschatz_custom_cats_v1','dt_tasks_v3','dt_level','deutsch_theme'
-  ];
+let _uid = null;
 
-  function buildSnapshot() {
-    const snap = {};
-    SYNC_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v !== null) snap[k] = v; });
-    return snap;
+async function upload(uid) {
+  try {
+    await setDoc(doc(db,'users',uid), { ...getSnapshot(), updatedAt: serverTimestamp() }, { merge: true });
+    const b = document.getElementById('syncBadge');
+    if (b) { b.style.display='inline'; b.textContent='✓ متزامن'; }
+  } catch(e) { console.warn('Upload error:', e); }
+}
+
+async function download(uid) {
+  try {
+    const snap = await getDoc(doc(db,'users',uid));
+    if (snap.exists()) applySnapshot(snap.data());
+  } catch(e) { console.warn('Download error:', e); }
+}
+
+// Patch localStorage to auto-sync after writes
+const _orig = localStorage.setItem.bind(localStorage);
+localStorage.setItem = (key, val) => {
+  _orig(key, val);
+  if (_uid && KEYS.includes(key)) {
+    clearTimeout(localStorage._t);
+    localStorage._t = setTimeout(() => upload(_uid), 2000);
   }
-  function applySnapshot(snap) {
-    if (!snap) return;
-    SYNC_KEYS.forEach(k => { if (snap[k] !== undefined) try { localStorage.setItem(k, snap[k]); } catch(e){} });
+};
+
+// ── Auth state — fires immediately with cached user if session exists ──
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    _uid = user.uid;
+    updateUserUI(user);
+    await download(user.uid);
+    hideLoginScreen();
+    if (typeof applyTheme === 'function') applyTheme();
+    if (typeof setView   === 'function') setView('home');
+    setInterval(() => upload(user.uid), 3 * 60 * 1000);
+  } else {
+    _uid = null;
+    updateUserUI(null);
+    showLoginScreen();
   }
+});
 
-  let _syncUid = null;
-
-  async function uploadProgress(uid) {
-    try {
-      await setDoc(doc(db,'users',uid), { ...buildSnapshot(), updatedAt: serverTimestamp() }, { merge: true });
-      const b = document.getElementById('syncBadge');
-      if (b) { b.style.display='inline'; b.textContent='✓ متزامن'; }
-    } catch(e) { console.warn('Sync upload failed:', e); }
-  }
-
-  async function downloadProgress(uid) {
-    try {
-      const snap = await getDoc(doc(db,'users',uid));
-      if (snap.exists()) {
-        const localTheme = localStorage.getItem('deutsch_theme');
-        applySnapshot(snap.data());
-        if (localTheme) localStorage.setItem('deutsch_theme', localTheme);
-      }
-    } catch(e) { console.warn('Sync download failed:', e); }
-  }
-
-  // Patch localStorage to auto-sync 2s after any save
-  const _orig = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = function(key, value) {
-    _orig(key, value);
-    if (_syncUid && SYNC_KEYS.includes(key)) {
-      clearTimeout(localStorage._t);
-      localStorage._t = setTimeout(() => uploadProgress(_syncUid), 2000);
-    }
-  };
-
-  // Show overlay while Firebase checks auth state
-  showOverlay();
-  let _authResolved = false;
-
-  onAuthStateChanged(auth, async (user) => {
-    _authResolved = true;
-    if (user) {
-      setUser(user);
-      await downloadProgress(user.uid);
-      _syncUid = user.uid;
-      // hide overlay first so the app is visible
-      hideOverlay();
-      // then render the home page
-      if (typeof applyTheme === 'function') applyTheme();
-      if (typeof setView   === 'function') setView('home');
-      else if (typeof render === 'function') render();
-      setInterval(() => uploadProgress(user.uid), 3 * 60 * 1000);
-    } else {
-      _syncUid = null;
-      setUser(null);
-      showOverlay();
-    }
-  });
-
-  window.authSignIn = async () => {
-    const err = document.getElementById('authErr');
-    if (err) err.style.display = 'none';
-    const btn = document.querySelector('.auth-google-btn');
-    if (btn) { btn.disabled=true; btn.style.opacity='0.7'; }
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
-    } catch(e) {
-      console.error('Sign-in error:', e);
-      if (err) { err.style.display='block'; err.textContent='خطأ: '+(e.message||'حاول مجدداً'); }
+// ── Exposed functions ──
+window.authSignIn = () => {
+  const err = document.getElementById('authErr');
+  const btn = document.querySelector('.auth-google-btn');
+  if (err) err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  signInWithPopup(auth, provider)
+    .catch(e => {
+      if (err) { err.style.display='block'; err.textContent = 'خطأ: ' + (e.message||'حاول مجدداً'); }
       if (btn) { btn.disabled=false; btn.style.opacity='1'; }
-    }
-  };
+    });
+};
 
-  window.authSignOut = async () => {
-    if (!confirm('تسجيل الخروج؟')) return;
-    if (_syncUid) await uploadProgress(_syncUid);
-    _syncUid = null;
-    await signOut(auth);
+window.authSignOut = async () => {
+  if (!confirm('تسجيل الخروج؟')) return;
+  if (_uid) await upload(_uid);
+  _uid = null;
+  await signOut(auth);
+};
+
+window.syncNow = async () => {
+  if (!_uid) return;
+  const b = document.getElementById('syncBadge');
+  if (b) { b.style.display='inline'; b.textContent='⏳'; }
+  await upload(_uid);
+};
+
+window.toggleUserMenu = () => {
+  const m = document.getElementById('userMenu');
+  if (m) m.classList.toggle('open');
+};
+
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('userAvatarWrap');
+  if (wrap && !wrap.contains(e.target)) {
     const m = document.getElementById('userMenu');
     if (m) m.classList.remove('open');
-  };
-
-  window.syncNow = async () => {
-    if (!_syncUid) return;
-    const b = document.getElementById('syncBadge');
-    if (b) { b.style.display='inline'; b.textContent='⏳'; }
-    await uploadProgress(_syncUid);
-  };
-
-  window.toggleUserMenu = () => {
-    const m = document.getElementById('userMenu');
-    if (m) m.classList.toggle('open');
-  };
-
-  document.addEventListener('click', e => {
-    const wrap = document.getElementById('userAvatarWrap');
-    if (wrap && !wrap.contains(e.target)) {
-      const m = document.getElementById('userMenu');
-      if (m) m.classList.remove('open');
-    }
-  });
-  })();
-}
+  }
+});
 </script>
 </body>
 </html>
