@@ -433,17 +433,39 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .stagger>*{animation:fade .4s ease backwards}
 
 /* ════════ AUTH OVERLAY ════════ */
-#authOverlay{position:fixed;inset:0;background:var(--paper);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;transition:opacity .35s}
+#authOverlay{position:fixed;inset:0;background:var(--paper);z-index:9999;display:flex;align-items:stretch;transition:opacity .35s}
 #authOverlay.hiding{opacity:0;pointer-events:none}
-.auth-card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:40px 32px 36px;max-width:380px;width:90%;text-align:center;box-shadow:var(--shadow-lg)}
-.auth-logo{font-size:48px;margin-bottom:16px}
-.auth-title{font-size:24px;font-weight:800;color:var(--ink);margin-bottom:6px}
-.auth-subtitle{font-size:14px;color:var(--ink-soft);margin-bottom:28px;line-height:1.5}
-.auth-google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 20px;background:#fff;border:1.5px solid #ddd;border-radius:12px;font-size:15px;font-weight:700;color:#3c4043;cursor:pointer;transition:.15s;font-family:inherit}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Left hero panel */
+.auth-hero{flex:1;background:linear-gradient(145deg,var(--hero1),var(--hero2) 60%,var(--hero3));display:flex;align-items:center;justify-content:center;padding:48px 56px;min-height:100vh}
+.auth-hero-in{max-width:440px;color:#fff}
+.auth-hero-logo{font-size:56px;margin-bottom:16px;display:block}
+.auth-hero-title{font-size:clamp(32px,4vw,52px);font-weight:800;line-height:1.1;margin:0 0 18px;color:#fff}
+.auth-hero-sub{font-size:16px;opacity:.9;line-height:1.65;margin-bottom:32px;color:#fff}
+.auth-hero-stats{display:flex;gap:24px;flex-wrap:wrap}
+.auth-stat{text-align:center}
+.auth-stat span{display:block;font-size:24px;font-weight:800;color:#fff}
+.auth-stat small{font-size:12px;opacity:.8;color:#fff}
+
+/* Right form panel */
+.auth-right{width:min(440px,100%);display:flex;align-items:center;justify-content:center;padding:32px 24px;background:var(--paper)}
+.auth-card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:36px 32px;width:100%;max-width:380px;box-shadow:var(--shadow-lg)}
+.auth-title{font-size:22px;font-weight:800;color:var(--ink);margin-bottom:8px}
+.auth-google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 20px;background:#fff;border:1.5px solid #ddd;border-radius:12px;font-size:15px;font-weight:700;color:#3c4043;cursor:pointer;transition:.15s;font-family:inherit}
 .auth-google-btn:hover{background:#f8f8f8;box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .auth-google-btn svg{flex:none}
-.auth-note{font-size:11.5px;color:var(--ink-soft);margin-top:16px;opacity:.7}
+.auth-note{font-size:11.5px;color:var(--ink-soft);margin-top:16px;opacity:.7;line-height:1.5}
 .auth-error{color:#c0392b;font-size:13px;margin-top:12px;display:none}
+
+/* Mobile — stack vertically */
+@media(max-width:680px){
+  #authOverlay{flex-direction:column}
+  .auth-hero{min-height:auto;padding:32px 24px;flex:none}
+  .auth-hero-title{font-size:28px}
+  .auth-hero-stats{display:none}
+  .auth-right{width:100%;padding:24px 16px}
+}
 
 /* User avatar in header */
 .user-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;cursor:pointer;border:2px solid var(--line);flex:none;transition:.15s}
@@ -761,19 +783,34 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 </head>
 <body data-theme="light">
 
-  <!-- Auth Overlay — shown until Firebase confirms login -->
-  <div id="authOverlay">
-    <div class="auth-card">
-      <div class="auth-logo">🇩🇪</div>
-      <div class="auth-title">Deutsch Lernen</div>
-      <div class="auth-subtitle" id="authSubtitle">جارٍ التحقق من الجلسة…</div>
-      <button class="auth-google-btn" onclick="window.authSignIn&&window.authSignIn()" style="display:none">
-        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.05 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.55-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-        تسجيل الدخول بـ Google
-      </button>
-      <div id="authErr" class="auth-error">حدث خطأ، حاول مجدداً</div>
-      <div class="auth-note">بياناتك محمية ومشفّرة</div>
-      <div id="authLoading" style="margin-top:12px;font-size:12px;color:var(--ink-soft);display:none">جارٍ التحقق من الحساب...</div>
+  <!-- Auth Overlay — Facebook style: left hero + right form -->
+  <div id="authOverlay" style="display:flex">
+    <div class="auth-hero">
+      <div class="auth-hero-in">
+        <div class="auth-hero-logo">🇩🇪</div>
+        <h1 class="auth-hero-title">Deutsch Lernen</h1>
+        <p class="auth-hero-sub">منصّة تعلّم اللغة الألمانية — مفردات، أفعال، مهام يومية، استماع وكتابة في مكان واحد.</p>
+        <div class="auth-hero-stats">
+          <div class="auth-stat"><span>+3,499</span><small>مفردة وفعل</small></div>
+          <div class="auth-stat"><span>31</span><small>مجموعة موضوعية</small></div>
+          <div class="auth-stat"><span>A1→C1</span><small>كل المستويات</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="auth-right">
+      <div class="auth-card">
+        <div class="auth-title">تسجيل الدخول</div>
+        <div class="auth-subtitle" id="authSubtitle" style="margin-bottom:20px;font-size:13.5px;color:var(--ink-soft)">ادخل بحسابك Google للحفظ والمزامنة على كل أجهزتك</div>
+        <button class="auth-google-btn" onclick="window.authSignIn&&window.authSignIn()" style="display:none">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.05 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.55-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          الدخول بـ Google
+        </button>
+        <div id="authErr" class="auth-error">حدث خطأ، حاول مجدداً</div>
+        <div class="auth-note">بياناتك محمية ومشفّرة — لن تُشارك مع أي طرف ثالث</div>
+        <div id="authLoading" style="margin-top:16px;font-size:13px;color:var(--ink-soft);text-align:center;display:none">
+          <span style="display:inline-block;animation:spin 1s linear infinite">⟳</span> جارٍ التحقق…
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1172,7 +1209,7 @@ function renderHome(){
     </div>
     <!-- Progress Tree -->
     <svg id="progressTree" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg"
-      style="position:fixed;bottom:0;left:0;width:min(420px,45vw);height:auto;z-index:0;pointer-events:none;opacity:.18">
+      style="position:fixed;bottom:0;left:0;width:min(420px,45vw);height:auto;z-index:0;pointer-events:none;opacity:.58">
       ${buildTreeSVG(tp,wp,vp)}
     </svg>
     <div class="cards2 stagger" style="position:relative;z-index:1">
@@ -1573,6 +1610,7 @@ function qInit(pool,type,count){
 }
 function paintQ(){
   const host=document.getElementById('qHost');if(!host)return;
+  if(!qz)return;
   if(qz.pos>=qz.order.length)return qResult(host);
   const item=qz.pool[qz.order[qz.pos]];
   const q=buildQ(qz.type,item);
@@ -1625,7 +1663,12 @@ function paintQ(){
       if(ok)qz.score++;else btn.classList.add('wrong');
       showNext();});
   }
-  document.getElementById('qRestart').onclick=()=>{qz=null;view==='words'?wQuiz(document.getElementById('wMain')):vQuiz(document.getElementById('vMain'))};
+  const restartBtn=document.getElementById('qRestart');
+  if(restartBtn)restartBtn.onclick=()=>{
+    qz=null;
+    if(view==='words'){const m=document.getElementById('wMain');if(m)wQuiz(m);}
+    else if(view==='verbs'){const m=document.getElementById('vMain');if(m)vQuiz(m);}
+  };
 }
 function buildQ(type,item){
   if(type==='wmeaning'){const [de,ar]=item.it;const dir=Math.random()<.5;
@@ -2637,27 +2680,7 @@ function ankiAnswer(grade){
 }
 
 /* ════════ TTS in Quiz ════════ */
-/* patch paintQ to add TTS button after the prompt */
-const _origPaintQ=paintQ;
-function paintQ(){
-  _origPaintQ();
-  // inject TTS button next to q-prompt if it contains German
-  const host=document.getElementById('qHost');if(!host)return;
-  const prompt=host.querySelector('.q-prompt');
-  if(!prompt)return;
-  const isDE=!prompt.classList.contains('ar-prompt');
-  if(isDE&&qz){
-    const txt=prompt.textContent.trim();
-    const btn=document.createElement('button');
-    btn.className='q-tts';btn.title='استمع للنطق';btn.textContent='🔊';
-    btn.onclick=()=>{
-      btn.classList.add('speaking');
-      ttsSpeak(txt);
-      setTimeout(()=>btn.classList.remove('speaking'),txt.length*80+500);
-    };
-    prompt.appendChild(btn);
-  }
-}
+/* TTS integrated directly in paintQ */
 
 /* ════════ SCHREIBEN — Diary + Lückentext ════════ */
 const DIARY_KEY='diary_entries_v1';
