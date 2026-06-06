@@ -75,7 +75,64 @@
 @keyframes adj-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 
 /* ── Vanta background ── */
-#vanta-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;filter:blur(2px);opacity:.25}
+#vanta-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;filter:blur(2px);opacity:.12}
+
+/* ══════════════════════════════════════
+   ADJEKTIVE — BROWSE + DETAIL + QUIZ
+══════════════════════════════════════ */
+
+/* Browse grid */
+.adj-browse-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:4px 0 24px}
+.adj-browse-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 14px;cursor:pointer;transition:.18s;position:relative;overflow:hidden}
+.adj-browse-card::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(31,107,83,.04),transparent);pointer-events:none}
+.adj-browse-card:hover{border-color:var(--green);transform:translateY(-3px);box-shadow:0 8px 24px rgba(31,107,83,.12)}
+.adj-browse-num{font-size:10px;font-weight:800;color:var(--ink-soft);margin-bottom:8px;letter-spacing:.5px}
+.adj-browse-pair{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.adj-browse-de{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--green-d)}
+.adj-browse-arrow{font-size:13px;color:var(--ink-soft)}
+.adj-browse-opp{font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--rust)}
+.adj-browse-ar{font-size:12px;color:var(--ink-soft);direction:rtl;text-align:right;line-height:1.4}
+
+/* Detail view */
+.adj-detail{max-width:600px;margin:0 auto;padding-bottom:32px}
+.adj-back-btn{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:8px 16px;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;margin-bottom:20px;transition:.15s;font-family:inherit}
+.adj-back-btn:hover{background:var(--card);color:var(--ink)}
+.adj-detail-card{background:var(--card);border:1px solid var(--line);border-radius:24px;overflow:hidden;box-shadow:var(--shadow-lg)}
+.adj-detail-num{font-size:11px;font-weight:800;color:var(--ink-soft);letter-spacing:1px;text-align:center;padding:16px 0 0;text-transform:uppercase}
+.adj-detail-pair-row{display:flex;align-items:center;justify-content:center;gap:0;padding:24px 32px}
+.adj-detail-col{flex:1;text-align:center;padding:16px}
+.adj-detail-col-pos{border-radius:16px 0 0 16px;background:color-mix(in srgb,var(--green) 6%,var(--paper))}
+.adj-detail-col-neg{border-radius:0 16px 16px 0;background:color-mix(in srgb,var(--rust) 6%,var(--paper))}
+.adj-detail-vs{font-size:24px;color:var(--ink-soft);padding:0 8px;flex-shrink:0}
+.adj-detail-de{font-family:'Fraunces',serif;font-size:clamp(22px,4vw,36px);font-weight:700;color:var(--ink);margin-bottom:8px}
+.adj-detail-col-pos .adj-detail-de{color:var(--green-d)}
+.adj-detail-col-neg .adj-detail-de{color:var(--rust)}
+.adj-detail-ar-main{font-size:15px;color:var(--ink-soft);direction:rtl;line-height:1.5}
+.adj-detail-example{padding:20px 28px 24px;border-top:1px solid var(--line);background:var(--paper-2)}
+.adj-detail-ex-label{font-size:11px;font-weight:800;color:var(--ink-soft);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.adj-detail-ex-de{font-style:italic;font-size:16px;color:var(--ink);margin-bottom:6px;line-height:1.5}
+.adj-detail-ex-ar{font-size:14px;color:var(--ink-soft);direction:rtl;text-align:right;line-height:1.5}
+.adj-detail-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-top:1px solid var(--line)}
+.adj-nav-btn{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;color:var(--ink);font-family:inherit}
+.adj-nav-btn:hover{background:var(--card);border-color:var(--green)}
+.adj-detail-counter{font-size:13px;color:var(--ink-soft);font-weight:600}
+
+/* Quiz enhancements */
+.adj-word-hint{font-size:14px;color:var(--ink-soft);margin-bottom:8px;direction:rtl}
+.adj-choice-text{display:block;font-family:'Fraunces',serif;font-size:17px}
+.adj-ex-reveal{margin-top:20px;background:var(--paper-2);border:1px solid var(--line);border-radius:14px;padding:14px 18px;animation:adj-fade .3s ease}
+.adj-ex-de{font-style:italic;font-size:15px;color:var(--ink);margin-bottom:5px;line-height:1.5}
+.adj-ex-ar{font-size:13px;color:var(--ink-soft);direction:rtl;text-align:right;line-height:1.5}
+@keyframes adj-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* Group pills update for 01-10 style */
+.adj-group-btn{background:var(--paper-2);border:1.5px solid var(--line);border-radius:99px;padding:5px 14px;font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:.15s;letter-spacing:.3px}
+.adj-group-btn.active{background:color-mix(in srgb,var(--amber) 15%,var(--paper));border-color:var(--amber);color:var(--amber)}
+
+/* Mode buttons */
+.adj-mode-btn{background:var(--paper-2);border:2px solid var(--line);border-radius:12px;padding:9px 18px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:.15s;font-family:inherit}
+.adj-mode-btn.active,.adj-mode-btn:hover{background:var(--green);border-color:var(--green);color:#fff}
+
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3479,178 +3536,153 @@ applyTheme();render();checkOnboarding();
 /* ════════════════════════════════════════
    ADJEKTIVE GEGENSATZPAARE — GAME
 ════════════════════════════════════════ */
-const ADJ_DATA = [
-  // Group 01-10
-  {de:'alt',opp:'jung',group:'01-10'},{de:'gut',opp:'schlecht',group:'01-10'},
-  {de:'groß',opp:'klein',group:'01-10'},{de:'viel',opp:'wenig',group:'01-10'},
-  {de:'alt',opp:'neu',group:'01-10'},{de:'früh',opp:'spät',group:'01-10'},
-  {de:'laut',opp:'leise',group:'01-10'},{de:'schwer',opp:'leicht',group:'01-10'},
-  {de:'richtig',opp:'falsch',group:'01-10'},{de:'schön',opp:'hässlich',group:'01-10'},
-  // Group 11-20
-  {de:'freundlich',opp:'unfreundlich',group:'11-20'},{de:'gesund',opp:'krank',group:'11-20'},
-  {de:'glücklich',opp:'unglücklich',group:'11-20'},{de:'heiß',opp:'kalt',group:'11-20'},
-  {de:'interessant',opp:'langweilig',group:'11-20'},{de:'möglich',opp:'unmöglich',group:'11-20'},
-  {de:'müde',opp:'ausgeschlafen',group:'11-20'},{de:'schnell',opp:'langsam',group:'11-20'},
-  {de:'teuer',opp:'billig',group:'11-20'},{de:'wichtig',opp:'unwichtig',group:'11-20'},
-  // Group 21-30
-  {de:'fröhlich',opp:'traurig',group:'21-30'},{de:'ganz',opp:'kaputt',group:'21-30'},
-  {de:'lang',opp:'kurz',group:'21-30'},{de:'nett',opp:'nicht nett',group:'21-30'},
-  {de:'normal',opp:'nicht normal',group:'21-30'},{de:'offen',opp:'geschlossen',group:'21-30'},
-  {de:'stark',opp:'schwach',group:'21-30'},{de:'voll',opp:'leer',group:'21-30'},
-  {de:'warm',opp:'kühl',group:'21-30'},{de:'weit',opp:'nah',group:'21-30'},
-  // Group 31-40
-  {de:'dick',opp:'dünn',group:'31-40'},{de:'fleißig',opp:'faul',group:'31-40'},
-  {de:'frei',opp:'besetzt',group:'31-40'},{de:'gesund',opp:'ungesund',group:'31-40'},
-  {de:'hart',opp:'weich',group:'31-40'},{de:'hell',opp:'dunkel',group:'31-40'},
-  {de:'hoch',opp:'tief',group:'31-40'},{de:'nass',opp:'trocken',group:'31-40'},
-  {de:'reich',opp:'arm',group:'31-40'},{de:'schwer',opp:'leicht',group:'31-40'},
-  // Group 41-50
-  {de:'bekannt',opp:'unbekannt',group:'41-50'},{de:'erste(r)',opp:'letzte(r)',group:'41-50'},
-  {de:'gut',opp:'böse',group:'41-50'},{de:'klug',opp:'dumm',group:'41-50'},
-  {de:'lebendig',opp:'tot',group:'41-50'},{de:'lecker',opp:'nicht lecker',group:'41-50'},
-  {de:'pünktlich',opp:'unpünktlich',group:'41-50'},{de:'sauber',opp:'schmutzig',group:'41-50'},
-  {de:'süß',opp:'sauer',group:'41-50'},{de:'zufrieden',opp:'unzufrieden',group:'41-50'},
-  // Group 51-60
-  {de:'bunt',opp:'schwarz-weiß',group:'51-60'},{de:'froh',opp:'sauer',group:'51-60'},
-  {de:'gemütlich',opp:'ungemütlich',group:'51-60'},{de:'hungrig',opp:'satt',group:'51-60'},
-  {de:'klar',opp:'unklar',group:'51-60'},{de:'letzte(r)',opp:'nächste(r)',group:'51-60'},
-  {de:'lustig',opp:'ernst',group:'51-60'},{de:'männlich',opp:'weiblich',group:'51-60'},
-  {de:'ruhig',opp:'nervös',group:'51-60'},{de:'sympathisch',opp:'unsympathisch',group:'51-60'},
-  // Group 61-70
-  {de:'altmodisch',opp:'modern',group:'61-70'},{de:'angenehm',opp:'unangenehm',group:'61-70'},
-  {de:'bequem',opp:'unbequem',group:'61-70'},{de:'breit',opp:'eng',group:'61-70'},
-  {de:'eckig',opp:'rund',group:'61-70'},{de:'gefährlich',opp:'ungefährlich',group:'61-70'},
-  {de:'optimistisch',opp:'pessimistisch',group:'61-70'},{de:'scharf',opp:'nicht scharf',group:'61-70'},
-  {de:'sonnig',opp:'wolkig',group:'61-70'},{de:'sportlich',opp:'unsportlich',group:'61-70'},
-  // Group 71-80
-  {de:'anwesend',opp:'abwesend',group:'71-80'},{de:'ehrlich',opp:'unehrlich',group:'71-80'},
-  {de:'frei',opp:'unfrei',group:'71-80'},{de:'höflich',opp:'unhöflich',group:'71-80'},
-  {de:'nackt',opp:'bekleidet',group:'71-80'},{de:'natürlich',opp:'unnatürlich',group:'71-80'},
-  {de:'ordentlich',opp:'unordentlich',group:'71-80'},{de:'positiv',opp:'negativ',group:'71-80'},
-  {de:'sicher',opp:'unsicher',group:'71-80'},{de:'vorsichtig',opp:'unvorsichtig',group:'71-80'},
-  // Group 81-90
-  {de:'flach',opp:'steil',group:'81-90'},{de:'geduldig',opp:'ungeduldig',group:'81-90'},
-  {de:'geizig',opp:'freigiebig',group:'81-90'},{de:'gerade',opp:'krumm',group:'81-90'},
-  {de:'geschickt',opp:'ungeschickt',group:'81-90'},{de:'gestresst',opp:'entspannt',group:'81-90'},
-  {de:'mutig',opp:'ängstlich',group:'81-90'},{de:'neugierig',opp:'gleichgültig',group:'81-90'},
-  {de:'spannend',opp:'langweilig',group:'81-90'},{de:'vernünftig',opp:'unvernünftig',group:'81-90'},
-  // Group 91-100
-  {de:'empfindlich',opp:'unempfindlich',group:'91-100'},{de:'fest',opp:'locker',group:'91-100'},
-  {de:'flach',opp:'hügelig',group:'91-100'},{de:'glatt',opp:'rau',group:'91-100'},
-  {de:'locker',opp:'elegant',group:'91-100'},{de:'riesig',opp:'winzig',group:'91-100'},
-  {de:'spitz',opp:'stumpf',group:'91-100'},{de:'waagerecht',opp:'senkrecht',group:'91-100'},
-  {de:'wertvoll',opp:'wertlos',group:'91-100'},{de:'wild',opp:'zahm',group:'91-100'},
-];
+const ADJ_DATA = [{"num": 1, "de": "alt", "opp": "jung", "ar": "قديم / كبير في السن", "arOpp": "شاب / صغير", "ex": "Mein Großvater ist sehr alt.", "exAr": "جدي كبير في السن جداً."}, {"num": 2, "de": "gut", "opp": "schlecht", "ar": "جيد", "arOpp": "سيئ", "ex": "Das Essen ist sehr gut.", "exAr": "الطعام جيد جداً."}, {"num": 3, "de": "groß", "opp": "klein", "ar": "كبير / طويل", "arOpp": "صغير / قصير", "ex": "Das Haus ist sehr groß.", "exAr": "البيت كبير جداً."}, {"num": 4, "de": "viel", "opp": "wenig", "ar": "كثير", "arOpp": "قليل", "ex": "Ich habe viel Arbeit heute.", "exAr": "عندي كثير من العمل اليوم."}, {"num": 5, "de": "alt", "opp": "neu", "ar": "قديم / عتيق", "arOpp": "جديد", "ex": "Sein Auto ist alt.", "exAr": "سيارته قديمة."}, {"num": 6, "de": "früh", "opp": "spät", "ar": "مبكر", "arOpp": "متأخر", "ex": "Ich stehe früh auf.", "exAr": "أستيقظ مبكراً."}, {"num": 7, "de": "laut", "opp": "leise", "ar": "صاخب / عالٍ", "arOpp": "هادئ / منخفض", "ex": "Die Musik ist zu laut.", "exAr": "الموسيقى عالية جداً."}, {"num": 8, "de": "schwer", "opp": "leicht", "ar": "صعب / ثقيل", "arOpp": "سهل / خفيف", "ex": "Die Prüfung ist schwer.", "exAr": "الامتحان صعب."}, {"num": 9, "de": "richtig", "opp": "falsch", "ar": "صحيح", "arOpp": "خاطئ", "ex": "Deine Antwort ist richtig.", "exAr": "إجابتك صحيحة."}, {"num": 10, "de": "schön", "opp": "hässlich", "ar": "جميل", "arOpp": "قبيح", "ex": "Die Blumen sind sehr schön.", "exAr": "الأزهار جميلة جداً."}, {"num": 11, "de": "freundlich", "opp": "unfreundlich", "ar": "ودود / لطيف", "arOpp": "غير ودود", "ex": "Die Verkäuferin ist sehr freundlich.", "exAr": "البائعة ودودة جداً."}, {"num": 12, "de": "gesund", "opp": "krank", "ar": "بصحة جيدة / صحي", "arOpp": "مريض", "ex": "Er ist heute krank.", "exAr": "هو مريض اليوم."}, {"num": 13, "de": "glücklich", "opp": "unglücklich", "ar": "سعيد", "arOpp": "تعيس / غير سعيد", "ex": "Sie ist sehr glücklich.", "exAr": "هي سعيدة جداً."}, {"num": 14, "de": "heiß", "opp": "kalt", "ar": "حار", "arOpp": "بارد", "ex": "Der Kaffee ist sehr heiß.", "exAr": "القهوة حارة جداً."}, {"num": 15, "de": "(un)interessant", "opp": "langweilig", "ar": "مثير للاهتمام", "arOpp": "ممل", "ex": "Das Buch ist sehr interessant.", "exAr": "الكتاب مثير للاهتمام جداً."}, {"num": 16, "de": "möglich", "opp": "unmöglich", "ar": "ممكن", "arOpp": "مستحيل", "ex": "Das ist leider nicht möglich.", "exAr": "هذا للأسف غير ممكن."}, {"num": 17, "de": "müde", "opp": "ausgeschlafen", "ar": "متعب / نعسان", "arOpp": "مرتاح / منتعش", "ex": "Ich bin sehr müde.", "exAr": "أنا متعب جداً."}, {"num": 18, "de": "schnell", "opp": "langsam", "ar": "سريع", "arOpp": "بطيء", "ex": "Das Auto fährt sehr schnell.", "exAr": "السيارة تسير بسرعة جداً."}, {"num": 19, "de": "teuer", "opp": "billig", "ar": "غالي", "arOpp": "رخيص", "ex": "Diese Uhr ist sehr teuer.", "exAr": "هذه الساعة غالية جداً."}, {"num": 20, "de": "wichtig", "opp": "unwichtig", "ar": "مهم", "arOpp": "غير مهم", "ex": "Das ist eine wichtige Frage.", "exAr": "هذا سؤال مهم."}, {"num": 21, "de": "fröhlich", "opp": "traurig", "ar": "مبهج / مرح", "arOpp": "حزين", "ex": "Die Kinder sind heute sehr fröhlich.", "exAr": "الأطفال مبهجون جداً اليوم."}, {"num": 22, "de": "ganz", "opp": "kaputt", "ar": "سليم / كامل", "arOpp": "مكسور / تالف", "ex": "Mein Handy ist kaputt.", "exAr": "هاتفي مكسور."}, {"num": 23, "de": "lang", "opp": "kurz", "ar": "طويل", "arOpp": "قصير", "ex": "Der Film ist sehr lang.", "exAr": "الفيلم طويل جداً."}, {"num": 24, "de": "nett", "opp": "nicht nett", "ar": "لطيف", "arOpp": "غير لطيف", "ex": "Er ist ein netter Mensch.", "exAr": "هو إنسان لطيف."}, {"num": 25, "de": "normal", "opp": "nicht normal", "ar": "عادي / طبيعي", "arOpp": "غير عادي", "ex": "Das ist ganz normal.", "exAr": "هذا أمر طبيعي تماماً."}, {"num": 26, "de": "offen", "opp": "geschlossen", "ar": "مفتوح", "arOpp": "مغلق", "ex": "Das Fenster ist offen.", "exAr": "النافذة مفتوحة."}, {"num": 27, "de": "stark", "opp": "schwach", "ar": "قوي", "arOpp": "ضعيف", "ex": "Er ist körperlich sehr stark.", "exAr": "هو قوي جسدياً جداً."}, {"num": 28, "de": "voll", "opp": "leer", "ar": "ممتلئ", "arOpp": "فارغ", "ex": "Die Flasche ist voll.", "exAr": "الزجاجة ممتلئة."}, {"num": 29, "de": "warm", "opp": "kühl", "ar": "دافئ", "arOpp": "بارد / فاتر", "ex": "Das Wasser ist warm.", "exAr": "الماء دافئ."}, {"num": 30, "de": "weit", "opp": "nah", "ar": "بعيد", "arOpp": "قريب", "ex": "Die Schule ist nicht weit.", "exAr": "المدرسة ليست بعيدة."}, {"num": 31, "de": "dick", "opp": "dünn", "ar": "سمين / سميك", "arOpp": "نحيف / رفيع", "ex": "Das Buch hat dicke Seiten.", "exAr": "الكتاب له صفحات سميكة."}, {"num": 32, "de": "fleißig", "opp": "faul", "ar": "مجتهد", "arOpp": "كسول", "ex": "Sie ist sehr fleißig.", "exAr": "هي مجتهدة جداً."}, {"num": 33, "de": "frei", "opp": "besetzt", "ar": "متاح / حر", "arOpp": "مشغول", "ex": "Ist dieser Platz frei?", "exAr": "هل هذا المكان متاح؟"}, {"num": 34, "de": "gesund", "opp": "ungesund", "ar": "صحي / مفيد للصحة", "arOpp": "غير صحي", "ex": "Obst und Gemüse sind gesund.", "exAr": "الفاكهة والخضروات صحية."}, {"num": 35, "de": "hart", "opp": "weich", "ar": "صلب / قاسٍ", "arOpp": "ناعم / طري", "ex": "Das Brot ist hart.", "exAr": "الخبز قاسٍ."}, {"num": 36, "de": "hell", "opp": "dunkel", "ar": "مضيء / فاتح", "arOpp": "مظلم / داكن", "ex": "Das Zimmer ist sehr hell.", "exAr": "الغرفة مضيئة جداً."}, {"num": 37, "de": "hoch", "opp": "tief", "ar": "عالٍ", "arOpp": "عميق / منخفض", "ex": "Der Berg ist sehr hoch.", "exAr": "الجبل عالٍ جداً."}, {"num": 38, "de": "nass", "opp": "trocken", "ar": "مبلل / رطب", "arOpp": "جاف", "ex": "Meine Jacke ist nass.", "exAr": "سترتي مبللة."}, {"num": 39, "de": "reich", "opp": "arm", "ar": "غني", "arOpp": "فقير", "ex": "Er ist sehr reich.", "exAr": "هو غني جداً."}, {"num": 40, "de": "schwer", "opp": "leicht", "ar": "ثقيل / صعب", "arOpp": "خفيف / سهل", "ex": "Der Koffer ist sehr schwer.", "exAr": "الحقيبة ثقيلة جداً."}, {"num": 41, "de": "bekannt", "opp": "unbekannt", "ar": "معروف / مشهور", "arOpp": "غير معروف / مجهول", "ex": "Er ist ein bekannter Sänger.", "exAr": "هو مغنٍ معروف."}, {"num": 42, "de": "erste(r)", "opp": "letzte(r)", "ar": "أول", "arOpp": "أخير", "ex": "Das ist mein erster Tag.", "exAr": "هذا أول يوم لي."}, {"num": 43, "de": "gut", "opp": "böse", "ar": "طيب / خير", "arOpp": "شرير / غاضب", "ex": "Sie ist ein gutes Kind.", "exAr": "هي طفلة طيبة."}, {"num": 44, "de": "klug", "opp": "dumm", "ar": "ذكي", "arOpp": "غبي", "ex": "Er ist ein kluger Student.", "exAr": "هو طالب ذكي."}, {"num": 45, "de": "lebendig", "opp": "tot", "ar": "حي / نشيط", "arOpp": "ميت", "ex": "Die Pflanze ist noch lebendig.", "exAr": "النبتة لا تزال حية."}, {"num": 46, "de": "lecker", "opp": "nicht lecker", "ar": "لذيذ", "arOpp": "غير لذيذ", "ex": "Das Essen ist sehr lecker.", "exAr": "الطعام لذيذ جداً."}, {"num": 47, "de": "pünktlich", "opp": "unpünktlich", "ar": "في الوقت المحدد / منضبط", "arOpp": "غير منضبط", "ex": "Er kommt immer pünktlich.", "exAr": "هو يأتي دائماً في الوقت المحدد."}, {"num": 48, "de": "sauber", "opp": "schmutzig", "ar": "نظيف", "arOpp": "وسخ", "ex": "Die Küche ist sehr sauber.", "exAr": "المطبخ نظيف جداً."}, {"num": 49, "de": "süß", "opp": "sauer", "ar": "حلو", "arOpp": "حامض", "ex": "Die Erdbeeren sind sehr süß.", "exAr": "الفراولة حلوة جداً."}, {"num": 50, "de": "zufrieden", "opp": "unzufrieden", "ar": "راضٍ / مرتاح", "arOpp": "غير راضٍ", "ex": "Ich bin mit meiner Arbeit zufrieden.", "exAr": "أنا راضٍ عن عملي."}, {"num": 51, "de": "bunt", "opp": "schwarz-weiß", "ar": "ملون", "arOpp": "أبيض وأسود", "ex": "Das Bild ist sehr bunt.", "exAr": "الصورة ملونة جداً."}, {"num": 52, "de": "froh", "opp": "sauer", "ar": "فرح / مسرور", "arOpp": "غاضب / زعلان", "ex": "Ich bin froh, dich zu sehen.", "exAr": "أنا مسرور برؤيتك."}, {"num": 53, "de": "gemütlich", "opp": "ungemütlich", "ar": "مريح / دافئ الأجواء", "arOpp": "غير مريح", "ex": "Das Café ist sehr gemütlich.", "exAr": "المقهى مريح جداً."}, {"num": 54, "de": "hungrig", "opp": "satt", "ar": "جائع", "arOpp": "شبعان", "ex": "Ich bin sehr hungrig.", "exAr": "أنا جائع جداً."}, {"num": 55, "de": "klar", "opp": "unklar", "ar": "واضح", "arOpp": "غير واضح", "ex": "Die Erklärung ist klar.", "exAr": "الشرح واضح."}, {"num": 56, "de": "letzte(r)", "opp": "nächste(r)", "ar": "الأخير / الماضي", "arOpp": "التالي / القادم", "ex": "Nächste Woche habe ich Urlaub.", "exAr": "الأسبوع القادم لدي إجازة."}, {"num": 57, "de": "lustig", "opp": "ernst", "ar": "مضحك / مرح", "arOpp": "جاد / صارم", "ex": "Der Film ist sehr lustig.", "exAr": "الفيلم مضحك جداً."}, {"num": 58, "de": "männlich", "opp": "weiblich", "ar": "ذكوري / مذكر", "arOpp": "أنثوي / مؤنث", "ex": "Das ist ein männlicher Name.", "exAr": "هذا اسم مذكر."}, {"num": 59, "de": "ruhig", "opp": "nervös", "ar": "هادئ", "arOpp": "متوتر / عصبي", "ex": "Bleib ruhig, bitte.", "exAr": "ابقَ هادئاً من فضلك."}, {"num": 60, "de": "sympathisch", "opp": "unsympathisch", "ar": "محبوب / لطيف", "arOpp": "غير محبوب", "ex": "Er ist sehr sympathisch.", "exAr": "هو محبوب جداً."}, {"num": 61, "de": "altmodisch", "opp": "modern", "ar": "قديم الطراز / تقليدي", "arOpp": "عصري / حديث", "ex": "Dieses Kleid ist altmodisch.", "exAr": "هذا الفستان قديم الطراز."}, {"num": 62, "de": "angenehm", "opp": "unangenehm", "ar": "لطيف / مريح", "arOpp": "غير لطيف / مزعج", "ex": "Das Wetter ist heute sehr angenehm.", "exAr": "الطقس لطيف جداً اليوم."}, {"num": 63, "de": "bequem", "opp": "unbequem", "ar": "مريح", "arOpp": "غير مريح", "ex": "Dieser Stuhl ist sehr bequem.", "exAr": "هذا الكرسي مريح جداً."}, {"num": 64, "de": "breit", "opp": "eng", "ar": "واسع / عريض", "arOpp": "ضيق", "ex": "Die Straße ist sehr breit.", "exAr": "الشارع واسع جداً."}, {"num": 65, "de": "eckig", "opp": "rund", "ar": "مزاوٍ / ذو زوايا", "arOpp": "مستدير / دائري", "ex": "Der Tisch ist eckig.", "exAr": "الطاولة ذات زوايا."}, {"num": 66, "de": "gefährlich", "opp": "ungefährlich", "ar": "خطير", "arOpp": "غير خطير / آمن", "ex": "Diese Straße ist sehr gefährlich.", "exAr": "هذا الشارع خطير جداً."}, {"num": 67, "de": "optimistisch", "opp": "pessimistisch", "ar": "متفائل", "arOpp": "متشائم", "ex": "Sie ist immer optimistisch.", "exAr": "هي دائماً متفائلة."}, {"num": 68, "de": "scharf", "opp": "nicht scharf", "ar": "حار / حاد", "arOpp": "غير حار / غير حاد", "ex": "Das Essen ist zu scharf.", "exAr": "الطعام حار جداً."}, {"num": 69, "de": "sonnig", "opp": "wolkig", "ar": "مشمس", "arOpp": "غائم", "ex": "Heute ist es sonnig.", "exAr": "الجو مشمس اليوم."}, {"num": 70, "de": "sportlich", "opp": "unsportlich", "ar": "رياضي", "arOpp": "غير رياضي", "ex": "Er ist sehr sportlich.", "exAr": "هو رياضي جداً."}, {"num": 71, "de": "anwesend", "opp": "abwesend", "ar": "حاضر", "arOpp": "غائب", "ex": "Alle Schüler sind anwesend.", "exAr": "جميع الطلاب حاضرون."}, {"num": 72, "de": "ehrlich", "opp": "unehrlich", "ar": "صادق / أمين", "arOpp": "غير صادق", "ex": "Er ist ein ehrlicher Mensch.", "exAr": "هو إنسان صادق."}, {"num": 73, "de": "frei", "opp": "unfrei", "ar": "حر", "arOpp": "غير حر / مقيد", "ex": "In diesem Land ist die Presse frei.", "exAr": "الصحافة حرة في هذا البلد."}, {"num": 74, "de": "höflich", "opp": "unhöflich", "ar": "مؤدب", "arOpp": "غير مؤدب", "ex": "Die Kinder sind sehr höflich.", "exAr": "الأطفال مؤدبون جداً."}, {"num": 75, "de": "nackt", "opp": "bekleidet", "ar": "عارٍ", "arOpp": "مرتدٍ ملابس / مكسو", "ex": "Das Baby liegt nackt auf dem Bett.", "exAr": "الطفل مستلقٍ عارياً على السرير."}, {"num": 76, "de": "natürlich", "opp": "unnatürlich", "ar": "طبيعي", "arOpp": "غير طبيعي / مصطنع", "ex": "Das ist ein natürlicher Prozess.", "exAr": "هذه عملية طبيعية."}, {"num": 77, "de": "ordentlich", "opp": "unordentlich", "ar": "منظم / مرتب", "arOpp": "غير منظم / فوضوي", "ex": "Sein Zimmer ist sehr ordentlich.", "exAr": "غرفته منظمة جداً."}, {"num": 78, "de": "positiv", "opp": "negativ", "ar": "إيجابي", "arOpp": "سلبي", "ex": "Deine Einstellung ist sehr positiv.", "exAr": "موقفك إيجابي جداً."}, {"num": 79, "de": "sicher", "opp": "unsicher", "ar": "آمن / متأكد", "arOpp": "غير آمن / غير متأكد", "ex": "Hier ist es sicher.", "exAr": "المكان هنا آمن."}, {"num": 80, "de": "vorsichtig", "opp": "unvorsichtig", "ar": "حذر", "arOpp": "غير حذر / متهور", "ex": "Sei bitte vorsichtig!", "exAr": "كن حذراً من فضلك!"}, {"num": 81, "de": "flach", "opp": "steil", "ar": "مسطح", "arOpp": "شديد الانحدار", "ex": "Der Weg ist sehr steil.", "exAr": "الطريق شديد الانحدار جداً."}, {"num": 82, "de": "geduldig", "opp": "ungeduldig", "ar": "صبور", "arOpp": "غير صبور / عجول", "ex": "Sei bitte geduldig!", "exAr": "كن صبوراً من فضلك!"}, {"num": 83, "de": "geizig", "opp": "freigiebig", "ar": "بخيل", "arOpp": "كريم / سخي", "ex": "Er ist leider sehr geizig.", "exAr": "هو للأسف بخيل جداً."}, {"num": 84, "de": "gerade", "opp": "krumm", "ar": "مستقيم", "arOpp": "منحنٍ / معوج", "ex": "Die Linie ist gerade.", "exAr": "الخط مستقيم."}, {"num": 85, "de": "geschickt", "opp": "ungeschickt", "ar": "ماهر / بارع", "arOpp": "غير ماهر / أخرق", "ex": "Sie ist sehr geschickt mit den Händen.", "exAr": "هي ماهرة جداً بيديها."}, {"num": 86, "de": "gestresst", "opp": "entspannt", "ar": "متوتر / مجهد", "arOpp": "مسترخٍ / هادئ", "ex": "Ich bin heute sehr gestresst.", "exAr": "أنا متوتر جداً اليوم."}, {"num": 87, "de": "mutig", "opp": "ängstlich", "ar": "شجاع", "arOpp": "خائف / جبان", "ex": "Er ist sehr mutig.", "exAr": "هو شجاع جداً."}, {"num": 88, "de": "neugierig", "opp": "gleichgültig", "ar": "فضولي", "arOpp": "لامبالٍ", "ex": "Kinder sind immer neugierig.", "exAr": "الأطفال دائماً فضوليون."}, {"num": 89, "de": "spannend", "opp": "langweilig", "ar": "مثير / شيق", "arOpp": "ممل", "ex": "Das Spiel war sehr spannend.", "exAr": "اللعبة كانت مثيرة جداً."}, {"num": 90, "de": "vernünftig", "opp": "unvernünftig", "ar": "عاقل / منطقي", "arOpp": "غير عاقل / غير منطقي", "ex": "Das ist eine vernünftige Idee.", "exAr": "هذه فكرة منطقية."}, {"num": 91, "de": "empfindlich", "opp": "unempfindlich", "ar": "حساس", "arOpp": "غير حساس", "ex": "Sie hat eine empfindliche Haut.", "exAr": "لديها بشرة حساسة."}, {"num": 92, "de": "fest", "opp": "locker", "ar": "متين / محكم", "arOpp": "فضفاض / مرخٍ", "ex": "Der Knoten ist sehr fest.", "exAr": "العقدة محكمة جداً."}, {"num": 93, "de": "flach", "opp": "hügelig", "ar": "مسطح", "arOpp": "تلي / متموج", "ex": "Das Land ist sehr flach.", "exAr": "الأرض مسطحة جداً."}, {"num": 94, "de": "glatt", "opp": "rau", "ar": "أملس / ناعم", "arOpp": "خشن", "ex": "Das Eis ist glatt.", "exAr": "الجليد أملس."}, {"num": 95, "de": "locker", "opp": "elegant", "ar": "كاجوال / غير رسمي", "arOpp": "أنيق / رسمي", "ex": "Er trägt heute lockere Kleidung.", "exAr": "هو يرتدي ملابس غير رسمية اليوم."}, {"num": 96, "de": "riesig", "opp": "winzig", "ar": "ضخم / هائل", "arOpp": "صغير جداً / ضئيل", "ex": "Der Elefant ist riesig.", "exAr": "الفيل ضخم."}, {"num": 97, "de": "spitz", "opp": "stumpf", "ar": "حاد / مدبب", "arOpp": "كليل / غير حاد", "ex": "Das Messer ist sehr spitz.", "exAr": "السكين حادة جداً."}, {"num": 98, "de": "waagerecht", "opp": "senkrecht", "ar": "أفقي", "arOpp": "عمودي", "ex": "Zieh eine waagerechte Linie.", "exAr": "ارسم خطاً أفقياً."}, {"num": 99, "de": "wertvoll", "opp": "wertlos", "ar": "ثمين / قيّم", "arOpp": "لا قيمة له / عديم القيمة", "ex": "Dieser Ring ist sehr wertvoll.", "exAr": "هذا الخاتم ثمين جداً."}, {"num": 100, "de": "wild", "opp": "zahm", "ar": "بري / متوحش", "arOpp": "أليف / مروّض", "ex": "Der Löwe ist ein wildes Tier.", "exAr": "الأسد حيوان بري."}];
 
-const ADJ_GROUPS = ['الكل','01-10','11-20','21-30','31-40','41-50','51-60','61-70','71-80','81-90','91-100'];
+const ADJ_GROUPS = ['الكل','1-10','11-20','21-30','31-40','41-50','51-60','61-70','71-80','81-90','91-100'];
 let adjState = {
-  group:'الكل', mode:'opp', // opp=find opposite, de=find word
+  group:'الكل', mode:'browse',
   queue:[], idx:0, score:0, wrong:0, streak:0, maxStreak:0,
   answered:false
 };
 
 function adjGetPool(){
   if(adjState.group==='الكل') return [...ADJ_DATA];
-  return ADJ_DATA.filter(a=>a.group===adjState.group);
+  const [from,to] = adjState.group.split('-').map(Number);
+  return ADJ_DATA.filter(a=>a.num>=from&&a.num<=to);
 }
 
 function adjShuffle(arr){
-  for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
-  return arr;
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
 }
 
-function adjGetChoices(correct, pool){
-  // Get 3 wrong answers
-  const others = adjShuffle(pool.filter(a=>a!==correct)).slice(0,3);
-  const choices = adjShuffle([correct, ...others]);
-  return choices;
+function adjGetChoices(correct,pool){
+  const key=adjState.mode==='opp'?'opp':adjState.mode==='ar'?'de':'ar';
+  const correctVal=correct[key];
+  const others=adjShuffle(pool.filter(a=>a[key]!==correctVal)).slice(0,3);
+  return adjShuffle([correct,...others]);
 }
 
 function adjStart(){
-  const pool = adjShuffle(adjGetPool());
-  adjState.queue = pool;
-  adjState.idx = 0;
-  adjState.score = 0;
-  adjState.wrong = 0;
-  adjState.streak = 0;
-  adjState.maxStreak = 0;
-  adjState.answered = false;
-  adjPaint();
+  const pool=adjShuffle(adjGetPool());
+  adjState.queue=pool;adjState.idx=0;adjState.score=0;adjState.wrong=0;adjState.streak=0;adjState.maxStreak=0;adjState.answered=false;
+  if(adjState.mode==='browse') adjBrowsePaint();
+  else adjPaint();
+}
+
+function adjBrowsePaint(){
+  const m=document.getElementById('adjMain');if(!m)return;
+  const pool=adjGetPool();
+  m.innerHTML=`<div class="adj-browse-grid">${pool.map(a=>`
+    <div class="adj-browse-card" onclick="adjShowDetail(${a.num})">
+      <div class="adj-browse-num">#${a.num}</div>
+      <div class="adj-browse-pair"><span class="adj-browse-de">${a.de}</span><span class="adj-browse-arrow"> ⟷ </span><span class="adj-browse-opp">${a.opp}</span></div>
+      <div class="adj-browse-ar">${a.ar}</div>
+    </div>`).join('')}</div>`;
+}
+
+function adjShowDetail(num){
+  const a=ADJ_DATA.find(x=>x.num===num);if(!a)return;
+  const m=document.getElementById('adjMain');
+  m.innerHTML=`
+    <div class="adj-detail fade">
+      <button class="adj-back-btn" onclick="adjBrowsePaint()">← رجوع للقائمة</button>
+      <div class="adj-detail-card">
+        <div class="adj-detail-num">الصفة #${a.num}</div>
+        <div class="adj-detail-pair-row">
+          <div class="adj-detail-col adj-detail-col-pos">
+            <div class="adj-detail-de">${a.de}</div>
+            <div class="adj-detail-ar-main">${a.ar}</div>
+          </div>
+          <div class="adj-detail-vs">⟷</div>
+          <div class="adj-detail-col adj-detail-col-neg">
+            <div class="adj-detail-de">${a.opp}</div>
+            <div class="adj-detail-ar-main">${a.arOpp}</div>
+          </div>
+        </div>
+        <div class="adj-detail-example">
+          <div class="adj-detail-ex-label">📝 Beispiel · مثال</div>
+          <div class="adj-detail-ex-de">${a.ex}</div>
+          <div class="adj-detail-ex-ar">${a.exAr}</div>
+        </div>
+        <div class="adj-detail-nav">
+          ${a.num>1?`<button class="adj-nav-btn" onclick="adjShowDetail(${a.num-1})">← السابق</button>`:'<span></span>'}
+          <span class="adj-detail-counter">${a.num} / ${ADJ_DATA.length}</span>
+          ${a.num<ADJ_DATA.length?`<button class="adj-nav-btn" onclick="adjShowDetail(${a.num+1})">التالي →</button>`:'<span></span>'}
+        </div>
+      </div>
+    </div>`;
 }
 
 function adjPaint(){
-  const m = document.getElementById('adjMain');
-  if(!m) return;
-
-  if(adjState.idx >= adjState.queue.length){
-    adjDone(m); return;
+  const m=document.getElementById('adjMain');if(!m)return;
+  if(adjState.idx>=adjState.queue.length){adjDone(m);return;}
+  const current=adjState.queue[adjState.idx];
+  const pool=adjGetPool();
+  const total=adjState.queue.length;
+  const pct=Math.round(adjState.idx/total*100);
+  let shownVal,shownLabel,answerKey,answerHint='';
+  if(adjState.mode==='opp'){
+    shownVal=current.de;shownLabel='ما نقيض هذه الصفة بالألمانية؟';answerKey='opp';answerHint=current.ar;
+  } else if(adjState.mode==='ar'){
+    shownVal=current.ar;shownLabel='ما الصفة الألمانية المقابلة؟';answerKey='de';
+  } else {
+    shownVal=current.de;shownLabel='ما معنى هذه الصفة بالعربية؟';answerKey='ar';
   }
-
-  const current = adjState.queue[adjState.idx];
-  const pool = adjGetPool();
-  const choices = adjGetChoices(current, pool);
-  const total = adjState.queue.length;
-  const pct = Math.round(adjState.idx / total * 100);
-  const isOppMode = adjState.mode === 'opp';
-
-  // What to show and what to find
-  const shown  = isOppMode ? current.de  : current.opp;
-  const answer = isOppMode ? current.opp : current.de;
-
-  m.innerHTML = `
+  const correctAnswer=current[answerKey];
+  const choices=adjGetChoices(current,pool);
+  m.innerHTML=`
     <div class="adj-progress"><div class="adj-progress-fill" style="width:${pct}%"></div></div>
     <div class="adj-game">
       <div class="adj-streak" id="adjStreak">${adjState.streak>1?'🔥 '+adjState.streak:''}</div>
       <div class="adj-round-label">${adjState.idx+1} / ${total}</div>
-      <div class="adj-word" id="adjWord">${shown}</div>
-      <div class="adj-hint">اختر <b>نقيض</b> هذه الصفة:</div>
+      <div class="adj-word" id="adjWord">${shownVal}</div>
+      ${answerHint?`<div class="adj-word-hint">${answerHint}</div>`:''}
+      <div class="adj-hint">${shownLabel}</div>
       <div class="adj-choices" id="adjChoices">
-        ${choices.map((c,i)=>{
-          const val = isOppMode ? c.opp : c.de;
-          return `<button class="adj-choice" data-val="${val}" data-correct="${val===answer}" onclick="adjAnswer(this,'${answer.replace(/'/g,"\\'")}')">
-            ${val}
+        ${choices.map(c=>{
+          const val=c[answerKey];
+          const isc=val===correctAnswer;
+          return `<button class="adj-choice" data-correct="${isc}" data-val="${val.replace(/"/g,'&quot;')}" onclick="adjAnswer(this,'${correctAnswer.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,' ')}')">
+            <span class="adj-choice-text">${val}</span>
           </button>`;
         }).join('')}
       </div>
-    </div>
-  `;
+      <div class="adj-ex-reveal" id="adjExReveal" style="display:none">
+        <div class="adj-ex-de">${current.ex}</div>
+        <div class="adj-ex-ar">${current.exAr}</div>
+      </div>
+    </div>`;
 }
 
-function adjAnswer(btn, correct){
-  if(adjState.answered) return;
-  adjState.answered = true;
-  const isCorrect = btn.dataset.correct === 'true';
-  const choices = document.querySelectorAll('.adj-choice');
-
-  choices.forEach(b=>{
-    b.disabled = true;
-    if(b.dataset.correct==='true') b.classList.add('correct');
+function adjAnswer(btn,correct){
+  if(adjState.answered)return;
+  adjState.answered=true;
+  const isCorrect=btn.dataset.correct==='true';
+  document.querySelectorAll('.adj-choice').forEach(b=>{
+    b.disabled=true;
+    if(b.dataset.correct==='true')b.classList.add('correct');
   });
-
   if(isCorrect){
     btn.classList.add('correct');
-    adjState.score++;
-    adjState.streak++;
-    if(adjState.streak>adjState.maxStreak) adjState.maxStreak=adjState.streak;
+    adjState.score++;adjState.streak++;
+    if(adjState.streak>adjState.maxStreak)adjState.maxStreak=adjState.streak;
     document.getElementById('adjWord').classList.add('correct');
   } else {
     btn.classList.add('wrong');
-    adjState.wrong++;
-    adjState.streak=0;
+    adjState.wrong++;adjState.streak=0;
     document.getElementById('adjWord').classList.add('wrong');
   }
-
-  setTimeout(()=>{
-    adjState.idx++;
-    adjState.answered=false;
-    adjPaint();
-  }, isCorrect ? 700 : 1100);
+  const ex=document.getElementById('adjExReveal');
+  if(ex)ex.style.display='block';
+  setTimeout(()=>{adjState.idx++;adjState.answered=false;adjPaint();},isCorrect?800:1500);
 }
 
 function adjDone(m){
-  const total = adjState.queue.length;
-  const pct = Math.round(adjState.score/total*100);
-  const emoji = pct>=90?'🏆':pct>=70?'🎉':pct>=50?'👍':'💪';
+  const total=adjState.queue.length;
+  const pct=Math.round(adjState.score/total*100);
+  const emoji=pct>=90?'🏆':pct>=70?'🎉':pct>=50?'👍':'💪';
   m.innerHTML=`
     <div class="adj-done">
       <div class="adj-done-icon">${emoji}</div>
@@ -3659,12 +3691,14 @@ function adjDone(m){
       <div class="adj-done-stats">
         <div class="adj-done-stat"><b style="color:var(--green)">${adjState.score}</b><span>✅ صحيح</span></div>
         <div class="adj-done-stat"><b style="color:var(--rust)">${adjState.wrong}</b><span>❌ خطأ</span></div>
-        <div class="adj-done-stat"><b style="color:var(--amber)">${adjState.maxStreak}</b><span>🔥 أطول سلسلة</span></div>
+        <div class="adj-done-stat"><b style="color:var(--amber)">${adjState.maxStreak}</b><span>🔥 سلسلة</span></div>
         <div class="adj-done-stat"><b>${pct}%</b><span>النتيجة</span></div>
       </div>
-      <button class="adj-restart-btn" onclick="adjStart()">🔄 العب مجدداً</button>
-    </div>
-  `;
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:8px">
+        <button class="adj-restart-btn" onclick="adjStart()">🔄 العب مجدداً</button>
+        <button class="adj-restart-btn" style="background:var(--paper-2);color:var(--ink)" onclick="adjSetMode('browse')">📖 تصفح الصفات</button>
+      </div>
+    </div>`;
 }
 
 function renderAdjektive(){
@@ -3672,49 +3706,46 @@ function renderAdjektive(){
   <div class="adj-wrap fade">
     <div class="adj-header">
       <h2>🔤 Adjektive · الصفات</h2>
-      <p>Die 200 wichtigsten deutschen Adjektive (Gegensatzpaare) · A1–B1</p>
+      <p>100 صفة ألمانية مع نقيضها · ترجمة عربية · أمثلة · A1–B1</p>
     </div>
     <div class="adj-score-bar">
-      <div class="adj-score-pill">✅ صحيح <span id="adjScoreDisp">0</span></div>
+      <div class="adj-score-pill">✅ صحيح <span id="adjScoreDisp" style="color:var(--green)">0</span></div>
       <div class="adj-score-pill">❌ خطأ <span id="adjWrongDisp" style="color:var(--rust)">0</span></div>
-      <div class="adj-score-pill">🔥 سلسلة <span id="adjStreakDisp">0</span></div>
+      <div class="adj-score-pill">🔥 سلسلة <span id="adjStreakDisp" style="color:var(--amber)">0</span></div>
     </div>
     <div class="adj-modes">
-      <button class="adj-mode-btn ${adjState.mode==='opp'?'active':''}" onclick="adjSetMode('opp')">🔄 أوجد النقيض</button>
-      <button class="adj-mode-btn ${adjState.mode==='de'?'active':''}" onclick="adjSetMode('de')">🔤 أوجد الصفة</button>
+      <button class="adj-mode-btn ${adjState.mode==='browse'?'active':''}" onclick="adjSetMode('browse')">📖 تصفح الصفات</button>
+      <button class="adj-mode-btn ${adjState.mode==='opp'?'active':''}" onclick="adjSetMode('opp')">⟷ أوجد النقيض</button>
+      <button class="adj-mode-btn ${adjState.mode==='ar'?'active':''}" onclick="adjSetMode('ar')">🔤 من عربي لألماني</button>
+      <button class="adj-mode-btn ${adjState.mode==='meaning'?'active':''}" onclick="adjSetMode('meaning')">💬 المعنى بالعربية</button>
     </div>
     <div class="adj-groups">
-      ${ADJ_GROUPS.map(g=>`<button class="adj-group-btn ${adjState.group===g?'active':''}" onclick="adjSetGroup('${g}')">${g==='الكل'?'🗂 الكل':'Adj '+g}</button>`).join('')}
+      ${ADJ_GROUPS.map(g=>`<button class="adj-group-btn ${adjState.group===g?'active':''}" onclick="adjSetGroup('${g}')">${g==='الكل'?'🗂 الكل':g}</button>`).join('')}
     </div>
     <div id="adjMain"></div>
   </div>`;
-
-  // wire score update
-  const origPaint = adjPaint;
-  window._adjPaintHook = setInterval(()=>{
+  clearInterval(window._adjPaintHook);
+  window._adjPaintHook=setInterval(()=>{
     const s=document.getElementById('adjScoreDisp');
     const w=document.getElementById('adjWrongDisp');
     const st=document.getElementById('adjStreakDisp');
-    if(s) s.textContent=adjState.score;
-    if(w) w.textContent=adjState.wrong;
-    if(st) st.textContent=adjState.streak;
-    if(!document.getElementById('adjMain')){clearInterval(window._adjPaintHook);}
+    if(s)s.textContent=adjState.score;
+    if(w)w.textContent=adjState.wrong;
+    if(st)st.textContent=adjState.streak;
+    if(!document.getElementById('adjMain'))clearInterval(window._adjPaintHook);
   },300);
-
   adjStart();
-
-  // hook home card
-  const goAdj = document.getElementById('goAdjektive');
-  if(goAdj) goAdj.onclick = ()=>setView('adjektive');
+  const goAdj=document.getElementById('goAdjektive');
+  if(goAdj)goAdj.onclick=()=>setView('adjektive');
 }
 
 function adjSetMode(m){
   adjState.mode=m;
-  if(view==='adjektive') renderAdjektive();
+  if(view==='adjektive')renderAdjektive();
 }
 function adjSetGroup(g){
   adjState.group=g;
-  if(view==='adjektive') renderAdjektive();
+  if(view==='adjektive')renderAdjektive();
 }
 
 
