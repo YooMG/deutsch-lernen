@@ -3346,24 +3346,23 @@ applyTheme();render();checkOnboarding();
   }
 
   function mkWord(){
-    const side = Math.floor(Math.random()*4);
-    let x,y;
-    if(side===0){x=Math.random()*W;y=-30;}
-    else if(side===1){x=W+30;y=Math.random()*H;}
-    else if(side===2){x=Math.random()*W;y=H+30;}
-    else{x=-30;y=Math.random()*H;}
-    const tx=(W/2-x)*0.003, ty=(H/2-y)*0.003;
+    // Start from random position anywhere on canvas
+    const x = Math.random()*W;
+    const y = Math.random()*H;
+    // Fully random slow direction — no pull toward center
+    const angle = Math.random()*Math.PI*2;
+    const speed = Math.random()*0.18 + 0.04;
     return {
       text: WORDS_DE[Math.floor(Math.random()*WORDS_DE.length)],
-      x,y,
-      vx: (Math.random()-.5)*0.4 + tx,
-      vy: (Math.random()-.5)*0.4 + ty,
+      x, y,
+      vx: Math.cos(angle)*speed,
+      vy: Math.sin(angle)*speed,
       a: 0,
-      maxA: Math.random()*0.55+0.1,
-      size: Math.random()*10+9,
+      maxA: Math.random()*0.5+0.12,
+      size: Math.random()*9+8,
       life: 0,
-      maxLife: Math.random()*420+180,
-      color: Math.random()<0.5 ? '#c8e63c' : 'rgba(255,255,255,0.8)',
+      maxLife: Math.random()*700+400,
+      color: Math.random()<0.5 ? '#c8e63c' : 'rgba(255,255,255,0.85)',
     };
   }
 
