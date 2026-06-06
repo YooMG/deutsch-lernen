@@ -75,7 +75,7 @@
 @keyframes adj-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
 
 /* ── Vanta background ── */
-#vanta-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+#vanta-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;filter:blur(2px);opacity:.7}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3691,19 +3691,21 @@ function adjSetGroup(g){
 (function(){
   function initVanta(){
     if(typeof VANTA === 'undefined' || typeof THREE === 'undefined') return;
+    // Detect light/dark theme
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
     VANTA.NET({
       el: '#vanta-bg',
       mouseControls: true,
       touchControls: true,
       gyroControls: false,
-      color: 0x4455CC,
-      backgroundColor: 0x00000000,
-      maxDistance: 20.0,
-      netSpeed: 8.0,
-      points: 20.0,
+      color: isDark ? 0x3fae8a : 0x1f6b53,        // green — app's --green
+      backgroundColor: 0x000000,
+      maxDistance: 25.0,
+      netSpeed: 4.0,
+      points: 12.0,
       scale: 1.0,
       scaleMobile: 1.0,
-      spacing: 15.0,
+      spacing: 18.0,
       showDots: true,
       backgroundAlpha: 0,
     });
