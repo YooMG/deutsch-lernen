@@ -532,87 +532,70 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .stagger>*{animation:fade .4s ease backwards}
 
 /* ════════ AUTH OVERLAY ════════ */
-#authOverlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:stretch;transition:opacity .35s}
+#authOverlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:stretch;transition:opacity .35s;background:#0b1d12}
 #authOverlay.hiding{opacity:0;pointer-events:none}
 
-/* LEFT — beige/white login panel */
-.auth-new-left{
-  width:42%;flex-shrink:0;
-  background:#f5f0e8;
-  display:flex;align-items:center;justify-content:center;
-  padding:40px 32px;
-}
-@media(max-width:700px){.auth-new-left{width:100%;position:absolute;inset:0;background:rgba(245,240,232,.97);z-index:2;align-items:flex-start;padding-top:60px}}
+/* 3-col wrapper */
+.aui-wrap{display:grid;grid-template-columns:5fr 4fr 3fr;width:100%;min-height:100vh}
+@media(max-width:900px){.aui-wrap{grid-template-columns:1fr}}
 
-.auth-new-card{
-  background:#fff;
-  border-radius:20px;
-  padding:36px 32px;
-  width:100%;max-width:340px;
-  box-shadow:0 4px 32px rgba(0,0,0,.08);
-}
-.auth-new-title{font-size:24px;font-weight:800;color:#1a1a1a;margin-bottom:8px;text-align:center}
-.auth-new-sub{font-size:13px;color:#666;text-align:center;margin-bottom:24px;line-height:1.6}
-.auth-new-note{font-size:11.5px;color:#999;text-align:center;margin-top:16px;line-height:1.5}
+/* COL 1 — dark green */
+.aui-left{background:#112d1b;padding:52px 44px;display:flex;flex-direction:column;justify-content:center;gap:20px;color:#fff}
+.aui-title{font-family:'Fraunces',serif;font-size:clamp(26px,3vw,44px);font-weight:800;line-height:1.18;margin:0}
+.aui-yellow{color:#f1cc45}
+.aui-sub{font-size:14px;color:rgba(209,250,229,.7);line-height:1.65;margin:0;max-width:340px}
+.aui-chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.aui-chip{display:flex;align-items:center;gap:8px;background:#214a31;color:#bbf7d0;border:1px solid rgba(52,211,153,.2);border-radius:12px;padding:8px 16px;font-size:12px;font-weight:600}
 
-/* Google button */
-.auth-google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 20px;background:#fff;border:1.5px solid #ddd;border-radius:12px;font-size:15px;font-weight:700;color:#3c4043;cursor:pointer;transition:.15s;font-family:inherit}
-.auth-google-btn:hover{background:#f8f8f8;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.auth-google-btn svg{flex:none}
-.auth-error{display:none;color:#c53030;font-size:13px;text-align:center;margin-top:10px;padding:10px;background:#fff5f5;border-radius:8px}
-
-/* RIGHT — dark green hero */
-.auth-new-right{
-  flex:1;
-  background:linear-gradient(135deg,#0d3320 0%,#1a5c35 50%,#0f4228 100%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:52px 44px;color:#fff;text-align:center;
-  position:relative;overflow:hidden;
-}
-.auth-new-right::before{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(circle at 70% 30%,rgba(255,255,255,.06),transparent 60%),
-             radial-gradient(circle at 20% 80%,rgba(0,0,0,.15),transparent 50%);
-}
-
+/* COL 2 — image */
+.aui-center{position:relative;overflow:hidden;min-height:480px}
+@media(max-width:900px){.aui-center{display:none}}
+.aui-img-bg{position:absolute;inset:0;background-image:url('https://images.unsplash.com/photo-1521791136368-1a46827d0af1?auto=format&fit=crop&w=800&q=80');background-size:cover;background-position:center}
+.aui-img-overlay{position:absolute;inset:0;background:rgba(10,45,20,.25)}
 /* flag */
-.auth-new-flag{
-  display:flex;flex-direction:column;
-  width:64px;height:44px;border-radius:8px;overflow:hidden;
-  box-shadow:0 4px 16px rgba(0,0,0,.3);
-  margin-bottom:28px;position:relative;z-index:1;
-}
-.auth-nf-b{flex:1;background:#000}
-.auth-nf-r{flex:1;background:#dd0000}
-.auth-nf-y{flex:1;background:#ffce00}
+.aui-flag-box{position:absolute;top:18px;left:18px;z-index:3;background:#fff;border-radius:14px;padding:10px;width:50px;height:50px;display:flex;flex-direction:column;box-shadow:0 4px 16px rgba(0,0,0,.25);overflow:hidden}
+.aui-fb-b{flex:1;background:#000}.aui-fb-r{flex:1;background:#dd0000}.aui-fb-y{flex:1;background:#ffce00}
+/* clock */
+.aui-clock{position:absolute;top:86px;left:18px;z-index:3;background:#6c5dd3;color:#fff;border-radius:16px;padding:12px 18px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.aui-clock-time{font-size:24px;font-weight:700;letter-spacing:1px;line-height:1}
+.aui-clock-city{font-size:10px;opacity:.75;margin-top:3px}
+/* article sticker */
+.aui-art-sticker{position:absolute;top:22px;right:22px;z-index:3;background:#fff;color:#1a1a1a;border-radius:16px;padding:10px 16px;box-shadow:0 6px 20px rgba(0,0,0,.2);transform:rotate(3deg);text-align:center;font-size:13px;font-weight:700}
+.aui-art-die{background:#dcfce7;color:#15803d;padding:1px 5px;border-radius:4px}
+/* WOD float */
+.aui-wod{position:absolute;bottom:50px;left:18px;z-index:3;background:#fff;color:#1a1a1a;border-radius:16px;padding:12px 16px;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:160px}
+.aui-wod-label{font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.aui-wod-word{font-size:13px;font-weight:800;color:#111827}
+/* level badge */
+.aui-level{position:absolute;bottom:16px;right:16px;z-index:3;background:#118a6b;color:#fff;font-size:11px;font-weight:800;padding:5px 10px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
 
-.auth-new-hero-title{
-  font-family:'Fraunces',serif;
-  font-size:clamp(32px,5vw,52px);
-  font-weight:700;line-height:1.1;
-  margin-bottom:18px;
-  position:relative;z-index:1;
-}
-.auth-new-hero-sub{
-  font-size:15px;color:rgba(255,255,255,.75);
-  line-height:1.7;max-width:360px;
-  margin-bottom:40px;
-  position:relative;z-index:1;
-  direction:rtl;
-}
-.auth-new-stats{
-  display:flex;gap:32px;flex-wrap:wrap;justify-content:center;
-  position:relative;z-index:1;
-}
-.auth-new-stat{display:flex;flex-direction:column;align-items:center;gap:4px}
-.auth-new-stat-num{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:#fff}
-.auth-new-stat-lbl{font-size:12px;color:rgba(255,255,255,.65)}
-
-@media(max-width:700px){
-  .auth-new-right{width:100%;min-height:100vh;padding-top:80px}
-  .auth-new-left{background:transparent}
-  .auth-new-card{box-shadow:0 8px 40px rgba(0,0,0,.15)}
-}
+/* COL 3 — white panel */
+.aui-right{background:#fff;padding:28px 24px;display:flex;flex-direction:column;gap:14px;overflow-y:auto}
+/* brand */
+.aui-brand-row{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid #f0f0f0}
+.aui-brand-text{font-size:15px;font-weight:800;color:#111827}
+.aui-brand-flag{display:flex;flex-direction:column;width:20px;height:14px;border-radius:2px;overflow:hidden}
+/* nav */
+.aui-nav{display:flex;flex-direction:column;gap:2px}
+.aui-nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;font-size:12px;font-weight:600;color:#374151;cursor:default}
+.aui-nav-item:hover{background:#f0fdf4;color:#166534}
+.aui-nav-ic{font-size:14px;width:28px;height:28px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* google login button */
+.auth-google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 20px;background:#f1cc45;border:none;border-radius:14px;font-size:14px;font-weight:800;color:#1a1a1a;cursor:pointer;transition:.18s;font-family:inherit;box-shadow:0 4px 16px rgba(241,204,69,.4)}
+.auth-google-btn:hover{background:#e0bc34;transform:translateY(-1px);box-shadow:0 8px 24px rgba(241,204,69,.5)}
+.auth-error{display:none;color:#c53030;font-size:12px;text-align:center;margin-top:6px;padding:8px;background:#fff5f5;border-radius:8px}
+.aui-auth-note{font-size:11px;color:#9ca3af;text-align:center;line-height:1.5}
+/* WOD card */
+.aui-wod-card{background:#f7f9f8;border:1px solid #e5e7eb;border-radius:14px;padding:14px 16px}
+.aui-wod-card-label{font-size:9px;font-weight:800;color:#059669;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:4px}
+.aui-wod-card-word{font-family:'Fraunces',serif;font-size:20px;font-weight:800;color:#111827;line-height:1.1}
+.aui-wod-card-ex{font-size:10px;color:#9ca3af;margin-top:4px;line-height:1.5}
+/* article quiz */
+.aui-art-card{background:#f7f9f8;border:1px solid #e5e7eb;border-radius:14px;padding:12px 16px}
+.aui-art-card-label{font-size:10px;font-weight:700;color:#6b7280;text-align:center;margin-bottom:8px}
+.aui-art-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.aui-art-btn{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:8px;font-size:16px;cursor:pointer;transition:.15s}
+.aui-art-btn:hover,.aui-art-active{background:#059669;color:#fff;border-color:#059669}
 
 /* ════════ LEVEL ONBOARDING ════════ */
 .onboard-overlay{position:fixed;inset:0;background:var(--paper);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -908,50 +891,94 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 
   <!-- Auth Overlay — Facebook style: left hero + right form -->
   <div id="authOverlay" style="display:flex">
+    <div class="aui-wrap">
 
-    <!-- LEFT: login card (beige/white) -->
-    <div class="auth-new-left">
-      <div class="auth-new-card">
-        <div class="auth-new-title">تسجيل الدخول</div>
-        <div class="auth-new-sub" id="authSubtitle">ادخل بحسابك Google للحفظ والمزامنة على كل أجهزتك</div>
+      <!-- COL 1: dark green text -->
+      <div class="aui-left">
+        <h1 class="aui-title">
+          Beginne <span class="aui-yellow">deine Reise</span> zur Beherrschung von <span class="aui-yellow">Deutsch heute!</span>
+        </h1>
+        <p class="aui-sub">Tausende Vokabeln, interaktive Übungen, adaptive Tests... alles an einem Ort.</p>
+        <div class="aui-chips">
+          <div class="aui-chip">⬛ Wortschatz</div>
+          <div class="aui-chip">📂 Themen (31)</div>
+          <div class="aui-chip">✨ A1 → C1</div>
+          <div class="aui-chip">🎧 Hören</div>
+          <div class="aui-chip">✏️ Schreiben</div>
+        </div>
+      </div>
+
+      <!-- COL 2: image with floating cards -->
+      <div class="aui-center">
+        <div class="aui-img-bg"></div>
+        <div class="aui-img-overlay"></div>
+        <!-- German flag top-left -->
+        <div class="aui-flag-box">
+          <div class="aui-fb-b"></div><div class="aui-fb-r"></div><div class="aui-fb-y"></div>
+        </div>
+        <!-- Clock top-left below flag -->
+        <div class="aui-clock">
+          <div class="aui-clock-time" id="authClock">--:--</div>
+          <div class="aui-clock-city" id="authCity">Berlin</div>
+        </div>
+        <!-- Article sticker top-right -->
+        <div class="aui-art-sticker">
+          <div class="aui-art-text">der, <span class="aui-art-die">die</span>, das</div>
+          <div>🤔 🚌</div>
+        </div>
+        <!-- WOD bottom-left -->
+        <div class="aui-wod">
+          <div class="aui-wod-label">Wort des Tages:</div>
+          <div class="aui-wod-word">GESUNDHEIT</div>
+          <div>😊</div>
+        </div>
+        <!-- Level badge bottom-right -->
+        <div class="aui-level">A2</div>
+      </div>
+
+      <!-- COL 3: white panel with login -->
+      <div class="aui-right">
+        <!-- Brand -->
+        <div class="aui-brand-row">
+          <span class="aui-brand-text"><b>Deutsch</b>Lernen</span>
+          <div class="aui-brand-flag"><div class="aui-fb-b"></div><div class="aui-fb-r"></div><div class="aui-fb-y"></div></div>
+        </div>
+        <!-- Nav items -->
+        <div class="aui-nav">
+          <div class="aui-nav-item"><span class="aui-nav-ic">⬛</span> Wortschatz</div>
+          <div class="aui-nav-item"><span class="aui-nav-ic">🌱</span> Verben</div>
+          <div class="aui-nav-item"><span class="aui-nav-ic">🎧</span> Hören</div>
+          <div class="aui-nav-item"><span class="aui-nav-ic">✏️</span> Schreiben</div>
+        </div>
+        <!-- Login button -->
         <button class="auth-google-btn" onclick="window.authSignIn&&window.authSignIn()" style="display:none">
-          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.05 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.55-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-          الدخول بـ Google
+          <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.05 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.55-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          ⏱️ Loslegen · الدخول بـ Google →
         </button>
         <div id="authErr" class="auth-error">حدث خطأ، حاول مجدداً</div>
-        <div class="auth-new-note">بياناتك محمية ومشفّرة — لن تُشارك مع أي طرف ثالث</div>
-        <div id="authLoading" style="margin-top:16px;font-size:13px;color:#888;text-align:center;display:none">
+        <div id="authSubtitle" style="font-size:11px;color:#999;text-align:center;margin-top:4px">ادخل بحسابك Google للحفظ والمزامنة على كل أجهزتك</div>
+        <div id="authLoading" style="margin-top:12px;font-size:13px;color:#888;text-align:center;display:none">
           <span style="display:inline-block;animation:spin 1s linear infinite">⟳</span> جارٍ التحقق…
         </div>
+        <!-- WOD card -->
+        <div class="aui-wod-card">
+          <div class="aui-wod-card-label">Wort des Tages</div>
+          <div class="aui-wod-card-word">GESUNDHEIT</div>
+          <div class="aui-wod-card-ex">Beispiel: Wir wünschen dir gute Gesundheit.</div>
+        </div>
+        <!-- Article quiz -->
+        <div class="aui-art-card">
+          <div class="aui-art-card-label">der / die / das</div>
+          <div class="aui-art-btns">
+            <button class="aui-art-btn" onclick="auiSelectArt(this)">👥</button>
+            <button class="aui-art-btn" onclick="auiSelectArt(this)">⬤</button>
+            <button class="aui-art-btn aui-art-active" onclick="auiSelectArt(this)">🤠</button>
+          </div>
+        </div>
+        <div class="aui-auth-note">بياناتك محمية ومشفّرة — لن تُشارك مع أي طرف ثالث</div>
       </div>
-    </div>
 
-    <!-- RIGHT: hero (dark green) -->
-    <div class="auth-new-right">
-      <!-- flag -->
-      <div class="auth-new-flag">
-        <div class="auth-nf-b"></div>
-        <div class="auth-nf-r"></div>
-        <div class="auth-nf-y"></div>
-      </div>
-      <h1 class="auth-new-hero-title">Deutsch Lernen</h1>
-      <p class="auth-new-hero-sub">منصّة تعلّم اللغة الألمانية — مفردات، أفعال، مهام يومية، استماع وكتابة في مكان واحد.</p>
-      <div class="auth-new-stats">
-        <div class="auth-new-stat">
-          <span class="auth-new-stat-num">A1→C1</span>
-          <span class="auth-new-stat-lbl">كل المستويات</span>
-        </div>
-        <div class="auth-new-stat">
-          <span class="auth-new-stat-num">31</span>
-          <span class="auth-new-stat-lbl">مجموعة موضوعية</span>
-        </div>
-        <div class="auth-new-stat">
-          <span class="auth-new-stat-num">3,499+</span>
-          <span class="auth-new-stat-lbl">مفردة وفعل</span>
-        </div>
-      </div>
     </div>
-
   </div>
 
 <!-- Top Bar -->
@@ -3463,6 +3490,29 @@ function changeLevelTo(lvl, el){
 applyTheme();render();checkOnboarding();
 </script>
 <script>
+// Auth page clock
+(function(){
+  function tickAuth(){
+    const el=document.getElementById('authClock');
+    if(!el)return;
+    const now=new Date();
+    el.textContent=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  }
+  tickAuth();
+  setInterval(tickAuth,1000);
+  // Auth article selector
+  window.auiSelectArt=function(el){
+    el.closest('.aui-art-btns').querySelectorAll('.aui-art-btn').forEach(b=>b.classList.remove('aui-art-active'));
+    el.classList.add('aui-art-active');
+  };
+  // Set city from timezone
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';
+  const cityEl=document.getElementById('authCity');
+  if(cityEl){
+    cityEl.textContent=tz.includes('Berlin')?'Berlin':tz.includes('Casablanca')?'Casablanca':tz.includes('Paris')?'Paris':tz.split('/').pop().replace('_',' ')||'Local';
+  }
+})();
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js')
