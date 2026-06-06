@@ -534,7 +534,7 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 /* ════════ AUTH OVERLAY ════════ */
 #authOverlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0b1d12;transition:opacity .35s;padding:20px;overflow:auto}
 #authOverlay.hiding{opacity:0;pointer-events:none}
-.auth-google-btn{transition:.18s}
+.auth-google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#f1cc45;border:none;border-radius:14px;padding:14px 16px;font-size:13px;font-weight:800;color:#1a1a1a;cursor:pointer;transition:.18s;font-family:inherit;box-shadow:0 4px 16px rgba(241,204,69,.4)}
 .auth-google-btn:hover{filter:brightness(1.05);transform:translateY(-1px)}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -863,7 +863,7 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
           </div>
         </div>
         <!-- Loslegen / Google button -->
-        <button class="auth-google-btn" onclick="window.authSignIn&&window.authSignIn()" style="display:none;width:100%;background:#f1cc45;border:none;border-radius:14px;padding:14px 16px;font-size:13px;font-weight:800;color:#1a1a1a;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(241,204,69,.4)">
+        <button class="auth-google-btn" id="authGoogleBtn" onclick="window.authSignIn&&window.authSignIn()">
           <div style="width:18px;height:12px;display:flex;flex-direction:column;border-radius:2px;overflow:hidden;flex-shrink:0"><div style="flex:1;background:#000"></div><div style="flex:1;background:#dc2626"></div><div style="flex:1;background:#f59e0b"></div></div>
           <svg width="16" height="16" viewBox="0 0 48 48" style="flex-shrink:0"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.05 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.55-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
           Loslegen · الدخول بـ Google <span style="margin-left:auto">→</span>
@@ -3361,6 +3361,7 @@ function changeLevelTo(lvl, el){
 /* init */
 applyTheme();render();checkOnboarding();
 </script>
+<script>
 // Auth page: clock, city, article buttons
 (function(){
   function tick(){var el=document.getElementById('authClock');if(!el)return;var n=new Date();el.textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
@@ -3370,9 +3371,124 @@ applyTheme();render();checkOnboarding();
   var ce=document.getElementById('authCity');if(ce)ce.textContent=city;
   window.auiSelectArt=function(el){el.parentNode.querySelectorAll('button').forEach(function(b){b.style.background='#fff';b.style.color='#9ca3af';b.style.borderColor='#e5e7eb';});el.style.background='#059669';el.style.color='#fff';el.style.borderColor='#059669';};
 })();
+</script>
+<script type="module">
+import { initializeApp }        from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
+                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
+                                 from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-<script>
-// ── Exposed functions ──
+const firebaseConfig = {
+  apiKey:            "AIzaSyBQk2i8GNKbuk1gh2wY1kYKBayZ4WaC74A",
+  authDomain:        "deutsch-lernen-e8378.firebaseapp.com",
+  projectId:         "deutsch-lernen-e8378",
+  storageBucket:     "deutsch-lernen-e8378.firebasestorage.app",
+  messagingSenderId: "433288128367",
+  appId:             "1:433288128367:web:6fdeac64188b332d58ea9a"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── UI helpers ──
+function showLoginScreen() {
+  const overlay = document.getElementById('authOverlay');
+  const subtitle = document.getElementById('authSubtitle');
+  const btn = document.querySelector('.auth-google-btn');
+  if (overlay) { overlay.style.display = 'flex'; overlay.style.opacity = '1'; }
+  if (subtitle) subtitle.textContent = 'سجّل دخولك لحفظ تقدّمك على كل أجهزتك';
+  if (btn) btn.style.display = 'flex';
+}
+
+function hideLoginScreen() {
+  const overlay = document.getElementById('authOverlay');
+  if (!overlay) return;
+  overlay.style.transition = 'opacity 0.3s';
+  overlay.style.opacity = '0';
+  setTimeout(() => { overlay.style.display = 'none'; overlay.style.opacity = '1'; overlay.style.transition = ''; }, 320);
+}
+
+function updateUserUI(user) {
+  const wrap  = document.getElementById('userAvatarWrap');
+  const img   = document.getElementById('userAvatar');
+  const name  = document.getElementById('userName');
+  const email = document.getElementById('userEmail');
+  const profileBtn = document.getElementById('profileNavBtn');
+  window._currentUser = user;
+  if (user) {
+    if (wrap)  wrap.style.display  = 'block';
+    if (img)   img.src = user.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName||'U') + '&background=2f7d8a&color=fff&size=64';
+    if (name)  name.textContent  = user.displayName || 'مستخدم';
+    if (email) email.textContent = user.email || '';
+    if (profileBtn) profileBtn.style.display = 'block';
+  } else {
+    if (wrap)  wrap.style.display  = 'none';
+    if (profileBtn) profileBtn.style.display = 'none';
+  }
+}
+
+// ── Sync keys ──
+const KEYS = ['wortschatz_known_v1','verben_known_v1','wortschatz_custom_v1',
+              'verben_custom_v1','wortschatz_custom_cats_v1','dt_tasks_v3','dt_level','deutsch_theme'];
+
+function getSnapshot() {
+  const o = {};
+  KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) o[k] = v; });
+  return o;
+}
+function applySnapshot(data) {
+  if (!data) return;
+  const theme = localStorage.getItem('deutsch_theme');
+  KEYS.forEach(k => { if (data[k] != null) try { localStorage.setItem(k, data[k]); } catch(e){} });
+  if (theme) localStorage.setItem('deutsch_theme', theme);
+}
+
+let _uid = null;
+
+async function upload(uid) {
+  try {
+    await setDoc(doc(db,'users',uid), { ...getSnapshot(), updatedAt: serverTimestamp() }, { merge: true });
+    const b = document.getElementById('syncBadge');
+    if (b) { b.style.display='inline'; b.textContent='✓ متزامن'; }
+  } catch(e) { console.warn('Upload error:', e); }
+}
+
+async function download(uid) {
+  try {
+    const snap = await getDoc(doc(db,'users',uid));
+    if (snap.exists()) applySnapshot(snap.data());
+  } catch(e) { console.warn('Download error:', e); }
+}
+
+// Patch localStorage to auto-sync after writes
+const _orig = localStorage.setItem.bind(localStorage);
+localStorage.setItem = (key, val) => {
+  _orig(key, val);
+  if (_uid && KEYS.includes(key)) {
+    clearTimeout(localStorage._t);
+    localStorage._t = setTimeout(() => upload(_uid), 300);
+  }
+};
+
+// ── Auth state ──
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    _uid = user.uid;
+    updateUserUI(user);
+    await download(user.uid);
+    hideLoginScreen();
+    if (typeof applyTheme === 'function') applyTheme();
+    if (typeof setView   === 'function') setView('home');
+    setInterval(() => upload(user.uid), 3 * 60 * 1000);
+  } else {
+    _uid = null;
+    updateUserUI(null);
+    showLoginScreen();
+  }
+});
+
 window.authSignIn = () => {
   const err = document.getElementById('authErr');
   const btn = document.querySelector('.auth-google-btn');
