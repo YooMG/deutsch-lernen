@@ -185,6 +185,58 @@ header.top{position:fixed;top:0;left:0;right:0;z-index:100;background:color-mix(
 .home-note{text-align:center;color:var(--ink-soft);font-size:13px;margin-top:30px}
 .home-note button{background:none;border:none;color:var(--rust);font-weight:700;cursor:pointer;text-decoration:underline;font-size:13px}
 
+/* ---------- home2 (new landing) ---------- */
+.home2{display:grid;grid-template-columns:1fr 1.1fr 1.1fr;gap:0;min-height:calc(100vh - 56px);max-width:1400px;margin:0 auto}
+@media(max-width:900px){.home2{grid-template-columns:1fr;min-height:auto}}
+
+/* Left */
+.h2-left{background:linear-gradient(160deg,#1a4a2e 0%,#1f6b3a 60%,#2a5a38 100%);color:#fff;padding:48px 36px;display:flex;align-items:center}
+.h2-hero-text h1{font-family:'Fraunces',serif;font-size:clamp(28px,3.5vw,48px);font-weight:700;line-height:1.15;margin-bottom:14px}
+.h2-accent{color:#c8e63c}
+.h2-sub{font-size:14px;opacity:.85;line-height:1.7;margin-bottom:24px}
+.h2-chips{display:flex;flex-wrap:wrap;gap:9px}
+.h2-chip{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:7px 15px;font-size:13px;font-weight:600;cursor:pointer;transition:.18s;white-space:nowrap}
+.h2-chip:hover{background:rgba(255,255,255,.24);transform:translateY(-2px)}
+
+/* Center */
+.h2-center{background:linear-gradient(160deg,#2d7a4a 0%,#1f8a55 50%,#165e38 100%);padding:36px 24px;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center}
+.h2-clock-card{background:rgba(255,255,255,.12);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.22);border-radius:22px;padding:22px 32px;text-align:center;color:#fff;min-width:180px}
+.h2-flag{font-size:36px;margin-bottom:8px}
+.h2-clock-time{font-family:'Fraunces',serif;font-size:52px;font-weight:700;letter-spacing:2px;line-height:1}
+.h2-clock-city{font-size:13px;opacity:.7;margin-top:4px;letter-spacing:1px}
+.h2-article-card{background:rgba(255,255,255,.9);border-radius:18px;padding:14px 20px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.h2-article-label{font-family:'Fraunces',serif;font-size:22px;font-weight:700;color:#1a4a2e}
+.h2-article-label em{color:#c8e63c;font-style:normal}
+.h2-article-label strong{color:#2d7a4a;font-style:normal}
+.h2-article-emoji{font-size:18px;margin-top:4px}
+.h2-progress-pill{background:rgba(255,255,255,.15);border-radius:99px;padding:8px 18px;color:#fff;font-size:12px;font-weight:700;width:100%;text-align:center}
+.h2-pp-bar{height:5px;background:rgba(255,255,255,.25);border-radius:99px;overflow:hidden;margin-bottom:6px}
+.h2-pp-fill{height:100%;background:#c8e63c;border-radius:99px;transition:width .6s}
+
+/* Right */
+.h2-right{background:#fff;padding:36px 28px;display:flex;flex-direction:column;gap:18px}
+[data-theme=dark] .h2-right{background:#1e1c18}
+.h2-brand{display:flex;align-items:center;font-size:22px;font-weight:800;margin-bottom:4px}
+.h2-brand-de{color:#1a4a2e}
+[data-theme=dark] .h2-brand-de{color:#4ec49a}
+.h2-brand-lernen{color:var(--ink)}
+.h2-nav{display:flex;flex-direction:column;gap:4px}
+.h2-nav-item{padding:10px 14px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;color:var(--ink);border:1px solid transparent}
+.h2-nav-item:hover{background:color-mix(in srgb,var(--green) 10%,var(--paper));border-color:var(--green);color:var(--green-d)}
+.h2-loslegen{background:linear-gradient(90deg,#c8e63c,#a8c82c);color:#1a4a2e;border:none;border-radius:16px;padding:16px 24px;font-size:17px;font-weight:800;cursor:pointer;transition:.2s;box-shadow:0 4px 16px rgba(168,200,44,.35);letter-spacing:.3px}
+.h2-loslegen:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(168,200,44,.45);filter:brightness(1.05)}
+.h2-wod-card{background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:16px 18px}
+.h2-wod-label{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--ink-soft);text-transform:uppercase;margin-bottom:4px}
+.h2-wod-word{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:var(--ink);line-height:1.1}
+.h2-wod-ar{font-size:14px;color:var(--green-d);font-weight:600;margin-top:2px}
+.h2-wod-icons{display:flex;gap:8px}
+.h2-wod-icon{width:32px;height:32px;border-radius:9px;background:var(--line);display:grid;place-items:center;font-size:14px}
+.h2-wod-icon-mid{background:var(--paper)}
+.h2-stats-row{display:flex;gap:12px;margin-top:auto}
+.h2-stat{flex:1;background:var(--paper-2);border-radius:12px;padding:12px;text-align:center;border:1px solid var(--line)}
+.h2-stat b{display:block;font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--ink)}
+.h2-stat span{font-size:11px;color:var(--ink-soft)}
+
 /* ---------- section shell ---------- */
 .shell{max-width:1280px;margin:0 auto;padding:20px 22px;display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start}
 @media(max-width:940px){.shell{grid-template-columns:1fr;padding:14px}}
@@ -914,6 +966,7 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 </aside>
 
 <div class="main-content"><div id="app"></div></div>
+<svg id="globalProgressTree" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg" style="position:fixed;bottom:0;left:0;width:min(420px,45vw);height:auto;z-index:0;pointer-events:none;opacity:.58"></svg>
 <footer>
   <div class="credit">
     <div class="who">
@@ -947,8 +1000,8 @@ let VTOTAL = VERBS.length;
 VERBS.forEach((v,i)=>v._id=i);
 function saveWCustom(){try{localStorage.setItem('wortschatz_custom_v1',JSON.stringify(wCustom))}catch(e){}}
 function saveVCustom(){try{localStorage.setItem('verben_custom_v1',JSON.stringify(vCustom))}catch(e){}}
-function addWord(ci,de,ar){WORDS[ci].items.push([de,ar]);wCustom.push({ci,de,ar});saveWCustom();WTOTAL=WORDS.reduce((s,c)=>s+c.items.length,0);}
-function addVerb(o){o._id=VERBS.length;VERBS.push(o);vCustom.push(o);saveVCustom();VTOTAL=VERBS.length;}
+function addWord(ci,de,ar){WORDS[ci].items.push([de,ar]);wCustom.push({ci,de,ar});saveWCustom();WTOTAL=WORDS.reduce((s,c)=>s+c.items.length,0);if(window.syncNow)window.syncNow();}
+function addVerb(o){o._id=VERBS.length;VERBS.push(o);vCustom.push(o);saveVCustom();VTOTAL=VERBS.length;if(window.syncNow)window.syncNow();}
 const LEVELS=['A1','A2','B1','B2'];
 const LVLC={A1:'#1f6b53',A2:'#2f7d8a',B1:'#c8821f',B2:'#b0533a'};
 const LVLNAME={A1:'مبتدئ',A2:'أساسي',B1:'متوسط',B2:'متقدّم'};
@@ -1040,7 +1093,20 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.data
 document.getElementById('brand').onclick=()=>setView('home');
 let st;searchInput.oninput=e=>{const q=e.target.value.trim();if(view==='words')W.query=q;else V.query=q;clearTimeout(st);st=setTimeout(render,160)};
 
+function updateGlobalTree(){
+  const wk=wCount(),vk=vCount();
+  const tot=WTOTAL+VTOTAL,tk=wk+vk;
+  const wp=Math.round(wk/WTOTAL*100),vp=Math.round(vk/VTOTAL*100);
+  let tasksDone=0;
+  try{const ts=JSON.parse(localStorage.getItem('dt_tasks_v3')||'{}');tasksDone=Object.values(ts).filter(e=>e&&e.done).length;}catch(e){}
+  const taskPct=Math.round(tasksDone/16*100);
+  const tp=Math.round((tk/tot*100)*0.8 + taskPct*0.2);
+  const el=document.getElementById('globalProgressTree');
+  if(el)el.innerHTML=buildTreeSVG(tp,wp,vp);
+}
+
 function render(){
+  updateGlobalTree();
   if(view==='home')return renderHome();
   if(view==='words')return renderWords();
   if(view==='tasks')return renderTasks();
@@ -1190,78 +1256,141 @@ function buildTreeSVG(tp, wp, vp){
 }
 
 
+function getWordOfDay(){
+  // Pick a deterministic word per day from WORDS
+  const today = new Date();
+  const dayKey = today.getFullYear()*10000 + (today.getMonth()+1)*100 + today.getDate();
+  let allWords = [];
+  WORDS.forEach((cat,ci) => cat.items.forEach((w,wi) => allWords.push({de:w[0],ar:w[1],cat:cat.ar})));
+  if(!allWords.length) return {de:'Gesundheit',ar:'الصحة',cat:''};
+  return allWords[dayKey % allWords.length];
+}
+
+function startClock(){
+  const el = document.getElementById('homeClock');
+  if(!el) return;
+  clearInterval(window._clockInterval);
+  function tick(){
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const el2 = document.getElementById('homeClock');
+    if(el2) el2.textContent = h+':'+m;
+    else clearInterval(window._clockInterval);
+  }
+  tick();
+  window._clockInterval = setInterval(tick, 1000);
+}
+
 function renderHome(){
   const wk=wCount(),vk=vCount();
   const wp=Math.round(wk/WTOTAL*100),vp=Math.round(vk/VTOTAL*100);
-  const tot=WTOTAL+VTOTAL,tk=wk+vk,tp=Math.round(tk/tot*100);
-  app.innerHTML=`<div class="home fade">
-    <div class="hero">
-      <div class="hero-in">
-        <div class="eyebrow">Wortschatz & Verben</div>
-        <h2>منصّة تعلّم <span class="de">Deutsch</span></h2>
-        <p>كل ما تحتاجه لبناء حصيلتك اللغوية في الألمانية: آلاف المفردات المنظّمة موضوعيًا، ومئات الأفعال بكل تصاريفها — مع بطاقات واختبارات ذكية تتابع تقدّمك.</p>
-        <div class="hero-stats">
-          <div class="hs"><div class="ring" style="--p:${tp}"><i>${tp}%</i></div><span>التقدّم الكلي</span></div>
-          <div class="hs"><b>${tot.toLocaleString('en')}</b><span>إجمالي المفردات والأفعال</span></div>
-          <div class="hs"><b>${tk.toLocaleString('en')}</b><span>أتقنتها حتى الآن</span></div>
+  const tot=WTOTAL+VTOTAL,tk=wk+vk;
+  let tasksDone=0;
+  try{const ts=JSON.parse(localStorage.getItem('dt_tasks_v3')||'{}');tasksDone=Object.values(ts).filter(e=>e&&e.done).length;}catch(e){}
+  const taskPct=Math.round(tasksDone/16*100);
+  const tp=Math.round((tk/tot*100)*0.8 + taskPct*0.2);
+  const wod = getWordOfDay();
+
+  // City based on timezone offset
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  const city = tz.includes('Berlin')||tz.includes('Europe/Berlin') ? 'Berlin'
+    : tz.includes('Casablanca')||tz.includes('Africa/Casablanca') ? 'Casablanca'
+    : tz.includes('Europe') ? 'Europa'
+    : tz.split('/').pop().replace('_',' ') || 'Local';
+
+  app.innerHTML=`
+  <div class="home2 fade">
+    <!-- LEFT PANEL -->
+    <div class="h2-left">
+      <div class="h2-hero-text">
+        <h1>
+          <span class="h2-accent">ابدأ</span> رحلتك<br>
+          نحو إتقان<br>
+          <span class="h2-accent">Deutsch</span><br>
+          <span style="font-size:.65em;opacity:.85">Beginne deine Reise heute!</span>
+        </h1>
+        <p class="h2-sub">
+          آلاف المفردات · تمارين تفاعلية · اختبارات ذكية<br>
+          <span style="font-size:12px;opacity:.75">Tausende Vokabeln, interaktive Übungen, adaptive Tests…</span>
+        </p>
+        <div class="h2-chips">
+          <div class="h2-chip" id="goWordsChip">📚 مفردات · Wortschatz</div>
+          <div class="h2-chip" id="goVerbsChip">🔤 أفعال · Verben</div>
+          <div class="h2-chip" id="goHorenChip">🎧 استماع · Hören</div>
+          <div class="h2-chip" id="goTasksChip">✨ A1 ← C1 · المستويات</div>
+          <div class="h2-chip" id="goSchreibenChip">✏️ كتابة · Schreiben</div>
+        </div>
+        <div style="margin-top:20px;font-size:13px;opacity:.7;line-height:1.8">
+          🎯 <strong>هدفك اليوم:</strong> تعلّم 5 كلمات جديدة<br>
+          📈 <strong>Dein Fortschritt:</strong> ${tp}% abgeschlossen
         </div>
       </div>
     </div>
-    <!-- Progress Tree -->
-    <svg id="progressTree" viewBox="0 0 400 600" xmlns="http://www.w3.org/2000/svg"
-      style="position:fixed;bottom:0;left:0;width:min(420px,45vw);height:auto;z-index:0;pointer-events:none;opacity:.58">
-      ${buildTreeSVG(tp,wp,vp)}
-    </svg>
-    <div class="cards2 stagger" style="position:relative;z-index:1">
-      <div class="feat" id="goWords" style="--accent:var(--blue)">
-        <div class="ic">📚</div>
-        <h3>المفردات<span class="de">Wortschatz Optimal</span></h3>
-        <div class="desc">${WTOTAL.toLocaleString('en')} كلمة موزّعة على ${WORDS.length} مجموعة موضوعية، مع بطاقات واختبارات تشمل التعرّف على الأداة (der/die/das).</div>
-        <div class="meta"><span class="mtag">📂 ${WORDS.length} مجموعة</span><span class="mtag">🃏 بطاقات</span><span class="mtag">✏️ اختبارات</span></div>
-        <div class="pbar"><i style="width:${wp}%"></i></div>
-        <div class="pinfo"><span>${wk.toLocaleString('en')} / ${WTOTAL.toLocaleString('en')}</span><span>${wp}%</span></div>
-        <button class="go">ابدأ المفردات ←</button>
+
+    <!-- CENTER PANEL: clock card -->
+    <div class="h2-center">
+      <div class="h2-clock-card">
+        <div class="h2-flag">🇩🇪</div>
+        <div class="h2-clock-time" id="homeClock">--:--</div>
+        <div class="h2-clock-city">${city}</div>
+        <div style="font-size:11px;opacity:.6;margin-top:2px">الوقت الآن · Aktuelle Zeit</div>
       </div>
-      <div class="feat" id="goVerbs" style="--accent:var(--green)">
-        <div class="ic">🔤</div>
-        <h3>الأفعال<span class="de">Deutsche Verben B1–B2</span></h3>
-        <div class="desc">${VTOTAL.toLocaleString('en')} فعل من A1 إلى B2 بكل التصاريف (Präteritum · Perfekt)، الفعل المساعد، الحالة الإعرابية، حروف الجر، وأمثلة مترجمة.</div>
-        <div class="meta"><span class="mtag">🎚 A1–B2</span><span class="mtag">🧩 تصاريف كاملة</span><span class="mtag">✏️ اختبارات</span></div>
-        <div class="pbar"><i style="width:${vp}%"></i></div>
-        <div class="pinfo"><span>${vk.toLocaleString('en')} / ${VTOTAL.toLocaleString('en')}</span><span>${vp}%</span></div>
-        <button class="go">ابدأ الأفعال ←</button>
+      <div class="h2-article-card">
+        <div class="h2-article-label">der, <em>die</em>, <strong>das</strong></div>
+        <div style="font-size:12px;color:#2d7a4a;font-weight:600;margin-top:4px">الأداة · Der Artikel</div>
+        <div class="h2-article-emoji">🤔 💬</div>
       </div>
-      <div class="feat" id="goTasks" style="--accent:var(--rust)">
-        <div class="ic">📅</div>
-        <h3>المهام اليومية<span class="de">Tägliche Aufgaben</span></h3>
-        <div class="desc">برنامج تدريب يومي على المهارات الأربع (قراءة · كتابة · استماع · تعبير) مع مؤقّت لكل مهمة، اختيار المستوى (A2–C1)، وزر يفتح ChatGPT مباشرة للتمرّن.</div>
-        <div class="meta"><span class="mtag">⏱ مؤقّت</span><span class="mtag">🎚 A2–C1</span><span class="mtag">🤖 ChatGPT</span></div>
-        <button class="go">ابدأ المهام ←</button>
-      </div>
-      <div class="feat" id="goHoren" style="--accent:var(--teal)">
-        <div class="ic">🎧</div>
-        <h3>الاستماع<span class="de">Hören · Audio-Player</span></h3>
-        <div class="desc">ارفع ملفاتك الصوتية (Podcast، راديو، حوارات...) واستمع بمشغّل متكامل مع التحكم في السرعة والتقديم/التأخير.</div>
-        <div class="meta"><span class="mtag">🎵 MP3 · M4A · WAV</span><span class="mtag">⏩ سرعة قابلة للضبط</span></div>
-        <button class="go">افتح المشغّل ←</button>
-      </div>
-      <div class="feat" id="goSchreiben" style="--accent:var(--green)">
-        <div class="ic">✍️</div>
-        <h3>الكتابة والإنتاج<span class="de">Schreiben · Lückentext</span></h3>
-        <div class="desc">يوميات ألمانية تُحفظ يومياً مع تصحيح عبر ChatGPT، وتمارين ملء الفراغات من مفرداتك وأفعالك.</div>
-        <div class="meta"><span class="mtag">📔 يوميات</span><span class="mtag">🔡 ملء الفراغات</span><span class="mtag">🤖 تصحيح ChatGPT</span></div>
-        <button class="go">ابدأ الكتابة ←</button>
+      <div class="h2-progress-pill">
+        <div class="h2-pp-bar"><div class="h2-pp-fill" style="width:${tp}%"></div></div>
+        <span>${tp}% · ${tk.toLocaleString('en')} / ${tot.toLocaleString('en')} gelernt · تعلّمتها</span>
       </div>
     </div>
-    <div class="home-note">يُحفظ تقدّمك تلقائيًا في متصفّحك · <button id="resetAll">تصفير كل التقدّم</button></div>
+
+    <!-- RIGHT PANEL -->
+    <div class="h2-right">
+      <div class="h2-brand">
+        <span class="h2-brand-de">Deutsch</span><span class="h2-brand-lernen">Lernen</span>
+        <span style="font-size:20px;margin-left:6px">🇩🇪</span>
+      </div>
+      <nav class="h2-nav">
+        <div class="h2-nav-item" id="rNavWords">📚 Wortschatz · المفردات</div>
+        <div class="h2-nav-item" id="rNavVerbs">🔤 Verben · الأفعال</div>
+        <div class="h2-nav-item" id="rNavHoren">🎧 Hören · الاستماع</div>
+        <div class="h2-nav-item" id="rNavSchreiben">✏️ Schreiben · الكتابة</div>
+        <div class="h2-nav-item" id="rNavTasks">📅 Tägliche Aufgaben · مهام يومية</div>
+      </nav>
+      <button class="h2-loslegen" id="goLoslegen">🇩🇪 ابدأ الآن · Loslegen →</button>
+      <div class="h2-wod-card">
+        <div class="h2-wod-label">WORT DES TAGES · كلمة اليوم</div>
+        <div class="h2-wod-word">${wod.de.toUpperCase()}</div>
+        <div class="h2-wod-ar">${wod.ar}</div>
+        <div class="h2-wod-cat" style="font-size:11px;opacity:.6;margin-top:4px">📂 ${wod.cat}</div>
+        <div style="margin-top:8px;font-size:12px;opacity:.75;display:flex;justify-content:space-between">
+          <span style="font-style:italic">der / die / das · الأداة</span>
+          <span style="color:var(--green-d);font-weight:700">اضغط للتعلّم ↗</span>
+        </div>
+      </div>
+      <div class="h2-stats-row">
+        <div class="h2-stat"><b>${WTOTAL.toLocaleString('en')}</b><span>كلمة · Wörter</span></div>
+        <div class="h2-stat"><b>${VTOTAL.toLocaleString('en')}</b><span>فعل · Verben</span></div>
+        <div class="h2-stat"><b>${WORDS.length}</b><span>موضوع · Themen</span></div>
+      </div>
+    </div>
   </div>`;
-  app.querySelectorAll('.feat .go').forEach((b,i)=>b.style.animationDelay=(i*80)+'ms');
-  document.getElementById('goWords').onclick=()=>setView('words');
-  document.getElementById('goVerbs').onclick=()=>setView('verbs');
-  const gt=document.getElementById('goTasks'); if(gt) gt.onclick=()=>setView('tasks');
-  const gh=document.getElementById('goHoren'); if(gh) gh.onclick=()=>setView('horen');
-  const gs=document.getElementById('goSchreiben'); if(gs) gs.onclick=()=>setView('schreiben');
-  document.getElementById('resetAll').onclick=()=>{if(confirm('تصفير كل تقدّمك في المفردات والأفعال؟')){wKnown={};vKnown={};saveW();saveV();render()}};
+
+  startClock();
+  document.getElementById('goLoslegen').onclick=()=>setView('words');
+  document.getElementById('goWordsChip').onclick=()=>setView('words');
+  document.getElementById('goVerbsChip').onclick=()=>setView('verbs');
+  document.getElementById('goHorenChip').onclick=()=>setView('horen');
+  document.getElementById('goTasksChip').onclick=()=>setView('tasks');
+  document.getElementById('goSchreibenChip').onclick=()=>setView('schreiben');
+  document.getElementById('rNavWords').onclick=()=>setView('words');
+  document.getElementById('rNavVerbs').onclick=()=>setView('verbs');
+  document.getElementById('rNavHoren').onclick=()=>setView('horen');
+  document.getElementById('rNavSchreiben').onclick=()=>setView('schreiben');
+  document.getElementById('rNavTasks').onclick=()=>setView('tasks');
 }
 
 /* ════════ WORDS ════════ */
@@ -2694,7 +2823,7 @@ function saveDiary(){try{localStorage.setItem(DIARY_KEY,JSON.stringify(diaryEntr
 /* Daily prompts - changes each day */
 const DIARY_PROMPTS=[
   {de:'Schreib über deinen heutigen Tag — was hast du gemacht?',ar:'اكتب عن يومك — ماذا فعلت اليوم؟'},
-  {de:'Beschreibe einen Gegenstand in deinem Zimmer auf Deutsch.',ar:'صف شيئاً في غرفتك بالألمانية.'},
+  {de:'Beschreibe irgendeinen Gegenstand um dich herum auf Deutsch.',ar:'صف أي شيء من حولك بالألمانية.'},
   {de:'Schreib 5 Sätze über dein Hobby oder deine Lieblingsbeschäftigung.',ar:'اكتب 5 جمل عن هوايتك المفضلة.'},
   {de:'Was hast du heute Neues auf Deutsch gelernt? Erkläre es kurz.',ar:'ماذا تعلمت اليوم بالألمانية؟ اشرحه باختصار.'},
   {de:'Beschreibe das Wetter heute und was du deswegen machst.',ar:'صف الطقس اليوم وماذا تفعل بسببه.'},
@@ -3329,7 +3458,7 @@ localStorage.setItem = (key, val) => {
   _orig(key, val);
   if (_uid && KEYS.includes(key)) {
     clearTimeout(localStorage._t);
-    localStorage._t = setTimeout(() => upload(_uid), 2000);
+    localStorage._t = setTimeout(() => upload(_uid), 300);
   }
 };
 
