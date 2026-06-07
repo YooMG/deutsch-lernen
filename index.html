@@ -1195,39 +1195,54 @@ function render(){
 /* daily tasks embedded app */
 function renderTasks(){
   const isDark = document.body.dataset.theme === 'dark';
-  app.innerHTML = '<div style="max-width:1080px;margin:0 auto;padding:18px 0 40px">'
-    + '<div style="background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:var(--shadow)">'
-    + '<iframe id="tasksFrame" style="width:100%;height:calc(100vh - 160px);min-height:620px;border:0;display:block;background:var(--paper)" title="\u0627\u0644\u0645\u0647\u0627\u0645 \u0627\u0644\u064a\u0648\u0645\u064a\u0629"></iframe>'
-    + '</div></div>';
-  const frame = document.getElementById('tasksFrame');
-  if(frame){
-    let html = TASKS_HTML;
-    /* Dark mode: override the light defaults that are now baked into TASKS_HTML */
-    if(isDark){
-      html = html
-        .replace('--bg:        #f5efe3;', '--bg:        #1a1813;')
-        .replace('--bg-card:   #fbf7ee;', '--bg-card:   #26231d;')
-        .replace('--bg-hover:  #efe7d7;', '--bg-hover:  #2e2b25;')
-        .replace('--bg-report: #fbf7ee;', '--bg-report: #26231d;')
-        .replace('--border:    rgba(44,42,36,0.12);', '--border:    rgba(255,255,255,0.08);')
-        .replace('--border-md: rgba(44,42,36,0.2);',  '--border-md: rgba(255,255,255,0.14);')
-        .replace('--text-1:    #2c2a24;', '--text-1:    #ece4d3;')
-        .replace('--text-2:    #6a6457;', '--text-2:    #9b9181;')
-        .replace('--text-3:    #aaa49c;', '--text-3:    #5a5550;')
-        /* fix rgba that are light-mode specific */
-        .replaceAll('rgba(44,42,36,0.12)', 'rgba(255,255,255,0.08)')
-        .replaceAll('rgba(44,42,36,0.2)',  'rgba(255,255,255,0.14)')
-        .replaceAll('rgba(44,42,36,0.08)', 'rgba(255,255,255,0.07)')
-        .replaceAll('rgba(44,42,36,0.07)', 'rgba(255,255,255,0.06)')
-        .replaceAll('rgba(44,42,36,0.06)', 'rgba(255,255,255,0.07)')
-        .replaceAll('rgba(44,42,36,0.05)', 'rgba(255,255,255,0.06)')
-        .replaceAll('rgba(44,42,36,0.03)', 'rgba(255,255,255,0.03)')
-        .replaceAll('rgba(44,42,36,0.1)',  'rgba(255,255,255,0.12)')
-        .replaceAll('rgba(44,42,36,0.25)', 'rgba(255,255,255,0.15)')
-        .replace('background: var(--bg-card); border: 0.5px solid var(--border-md)', 'background: #2a2a38; border: 0.5px solid var(--border-md)');
-    }
-    frame.srcdoc = html;
+
+  // Extract body content from TASKS_HTML (between <body> and </body>)
+  const bodyMatch = TASKS_HTML.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : '';
+
+  // Extract styles from TASKS_HTML and adapt for current theme
+  let styleMatch = TASKS_HTML.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  let taskStyles = styleMatch ? styleMatch[1] : '';
+
+  // Adapt colors for dark mode
+  if(isDark){
+    taskStyles = taskStyles
+      .replace('--bg:        #f5efe3;', '--bg:        var(--paper);')
+      .replace('--bg-card:   #fbf7ee;', '--bg-card:   var(--card);')
+      .replace('--bg-hover:  #efe7d7;', '--bg-hover:  var(--paper-2);')
+      .replace('--bg-report: #fbf7ee;', '--bg-report: var(--card);')
+      .replace('--border:    rgba(44,42,36,0.12);', '--border:    rgba(255,255,255,0.08);')
+      .replace('--border-md: rgba(44,42,36,0.2);',  '--border-md: rgba(255,255,255,0.14);')
+      .replace('--text-1:    #2c2a24;', '--text-1:    var(--ink);')
+      .replace('--text-2:    #6a6457;', '--text-2:    var(--ink-soft);')
+      .replace('--text-3:    #aaa49c;', '--text-3:    #5a5550;')
+      .replaceAll('rgba(44,42,36,', 'rgba(255,255,255,');
+  } else {
+    taskStyles = taskStyles
+      .replace('--bg:        #f5efe3;', '--bg:        var(--paper);')
+      .replace('--bg-card:   #fbf7ee;', '--bg-card:   var(--card);')
+      .replace('--bg-hover:  #efe7d7;', '--bg-hover:  var(--paper-2);')
+      .replace('--text-1:    #2c2a24;', '--text-1:    var(--ink);')
+      .replace('--text-2:    #6a6457;', '--text-2:    var(--ink-soft);');
   }
+
+  // Remove html/body rules from task styles since we're embedding
+  taskStyles = taskStyles.replace(/html\s*,\s*body\s*\{[^}]*\}/g, '')
+                         .replace(/html\s*\{[^}]*\}/g, '')
+                         .replace(/body\s*\{[^}]*\}/g, '');
+
+  // Render directly in app — no iframe
+  app.innerHTML = `<div class="tasks-embed fade" style="max-width:1080px;margin:0 auto;padding:12px 0 40px">
+    <style>${taskStyles}</style>
+    ${bodyContent}
+  </div>`;
+
+  // Run the embedded scripts
+  const scripts = TASKS_HTML.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
+  scripts.forEach(scriptTag => {
+    const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
+    try { new Function(code)(); } catch(e) { console.warn('Task script error:', e); }
+  });
 }
 
 /* ════════ HOME ════════ */
@@ -1411,6 +1426,7 @@ function renderHome(){
   const gt=document.getElementById('goTasks'); if(gt) gt.onclick=()=>setView('tasks');
   const gh=document.getElementById('goHoren'); if(gh) gh.onclick=()=>setView('horen');
   const gs=document.getElementById('goSchreiben'); if(gs) gs.onclick=()=>setView('schreiben');
+  const ga=document.getElementById('goAdjektive'); if(ga) ga.onclick=()=>setView('adjektive');
   document.getElementById('resetAll').onclick=()=>{if(confirm('تصفير كل تقدّمك في المفردات والأفعال؟')){wKnown={};vKnown={};saveW();saveV();render()}};
 }
 
