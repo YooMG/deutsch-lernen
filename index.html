@@ -120,6 +120,8 @@
 /* Quiz enhancements */
 .adj-word-hint{font-size:14px;color:var(--ink-soft);margin-bottom:8px;direction:rtl}
 .adj-choice-text{display:block;font-family:'Fraunces',serif;font-size:17px}
+.adj-next-btn{display:flex;align-items:center;justify-content:center;margin:18px auto 0;padding:13px 36px;background:var(--green);color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:.18s;width:100%;max-width:320px}
+.adj-next-btn:hover{filter:brightness(1.08);transform:translateY(-2px)}
 .adj-ex-reveal{margin-top:20px;background:var(--paper-2);border:1px solid var(--line);border-radius:14px;padding:14px 18px;animation:adj-fade .3s ease}
 .adj-ex-de{font-style:italic;font-size:15px;color:var(--ink);margin-bottom:5px;line-height:1.5}
 .adj-ex-ar{font-size:13px;color:var(--ink-soft);direction:rtl;text-align:right;line-height:1.5}
@@ -1136,7 +1138,7 @@ themeBtn.onclick=()=>{theme=theme==='dark'?'light':'dark';try{localStorage.setIt
 /* ---- state ---- */
 let view='home';
 let W={cat:0,mode:'browse',qmode:'meaning',query:'',qcount:10,onlyUnknown:false};
-let V={level:'all',mode:'browse',qmode:'meaning',aux:'all',prep:false,cas:false,query:'',qcount:10,onlyUnknown:false};
+let V={level:'A1',mode:'browse',qmode:'meaning',aux:'all',prep:false,cas:false,query:'',qcount:10,onlyUnknown:false};
 
 /* ---- helpers ---- */
 function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
@@ -1196,54 +1198,125 @@ function render(){
 function renderTasks(){
   const isDark = document.body.dataset.theme === 'dark';
 
-  // Extract body content from TASKS_HTML (between <body> and </body>)
+  // Extract body content from TASKS_HTML
   const bodyMatch = TASKS_HTML.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   const bodyContent = bodyMatch ? bodyMatch[1] : '';
 
-  // Extract styles from TASKS_HTML and adapt for current theme
+  // Extract styles and fully replace color vars to match app theme
   let styleMatch = TASKS_HTML.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
   let taskStyles = styleMatch ? styleMatch[1] : '';
 
-  // Adapt colors for dark mode
+  // Always adapt to app CSS variables regardless of theme
+  taskStyles = taskStyles
+    .replace('--bg:        #f5efe3;', '--bg: var(--paper);')
+    .replace('--bg-card:   #fbf7ee;', '--bg-card: var(--card);')
+    .replace('--bg-hover:  #efe7d7;', '--bg-hover: var(--paper-2);')
+    .replace('--bg-report: #fbf7ee;', '--bg-report: var(--card);')
+    .replace('--text-1:    #2c2a24;', '--text-1: var(--ink);')
+    .replace('--text-2:    #6a6457;', '--text-2: var(--ink-soft);')
+    .replace('--text-3:    #aaa49c;', '--text-3: var(--ink-soft);');
+
   if(isDark){
     taskStyles = taskStyles
-      .replace('--bg:        #f5efe3;', '--bg:        var(--paper);')
-      .replace('--bg-card:   #fbf7ee;', '--bg-card:   var(--card);')
-      .replace('--bg-hover:  #efe7d7;', '--bg-hover:  var(--paper-2);')
-      .replace('--bg-report: #fbf7ee;', '--bg-report: var(--card);')
-      .replace('--border:    rgba(44,42,36,0.12);', '--border:    rgba(255,255,255,0.08);')
+      .replace('--border:    rgba(44,42,36,0.12);', '--border: rgba(255,255,255,0.08);')
       .replace('--border-md: rgba(44,42,36,0.2);',  '--border-md: rgba(255,255,255,0.14);')
-      .replace('--text-1:    #2c2a24;', '--text-1:    var(--ink);')
-      .replace('--text-2:    #6a6457;', '--text-2:    var(--ink-soft);')
-      .replace('--text-3:    #aaa49c;', '--text-3:    #5a5550;')
-      .replaceAll('rgba(44,42,36,', 'rgba(255,255,255,');
+      .replaceAll('rgba(44,42,36,0.12)', 'rgba(255,255,255,0.08)')
+      .replaceAll('rgba(44,42,36,0.2)',  'rgba(255,255,255,0.14)')
+      .replaceAll('rgba(44,42,36,0.08)', 'rgba(255,255,255,0.07)')
+      .replaceAll('rgba(44,42,36,0.07)', 'rgba(255,255,255,0.06)')
+      .replaceAll('rgba(44,42,36,0.06)', 'rgba(255,255,255,0.05)')
+      .replaceAll('rgba(44,42,36,0.05)', 'rgba(255,255,255,0.05)')
+      .replaceAll('rgba(44,42,36,0.03)', 'rgba(255,255,255,0.03)')
+      .replaceAll('rgba(44,42,36,0.1)',  'rgba(255,255,255,0.10)')
+      .replaceAll('rgba(44,42,36,0.25)', 'rgba(255,255,255,0.15)');
   } else {
     taskStyles = taskStyles
-      .replace('--bg:        #f5efe3;', '--bg:        var(--paper);')
-      .replace('--bg-card:   #fbf7ee;', '--bg-card:   var(--card);')
-      .replace('--bg-hover:  #efe7d7;', '--bg-hover:  var(--paper-2);')
-      .replace('--text-1:    #2c2a24;', '--text-1:    var(--ink);')
-      .replace('--text-2:    #6a6457;', '--text-2:    var(--ink-soft);');
+      .replace('--border:    rgba(44,42,36,0.12);', '--border: var(--line);')
+      .replace('--border-md: rgba(44,42,36,0.2);',  '--border-md: var(--line);');
   }
 
-  // Remove html/body rules from task styles since we're embedding
-  taskStyles = taskStyles.replace(/html\s*,\s*body\s*\{[^}]*\}/g, '')
-                         .replace(/html\s*\{[^}]*\}/g, '')
-                         .replace(/body\s*\{[^}]*\}/g, '');
+  // Strip html/body rules
+  taskStyles = taskStyles
+    .replace(/html\s*,\s*body\s*\{[^}]*\}/g, '')
+    .replace(/html\s*\{[^}]*\}/g, '')
+    .replace(/body\s*\{[^}]*\}/g, '');
 
-  // Render directly in app — no iframe
+  // Add extra overrides to ensure full compatibility
+  taskStyles += `
+    .tasks-embed, .tasks-embed .app {
+      background: transparent !important;
+      color: var(--ink) !important;
+    }
+    .tasks-embed .card {
+      background: var(--card) !important;
+      border-color: var(--line) !important;
+      color: var(--ink) !important;
+    }
+    .tasks-embed .card-name,
+    .tasks-embed .jour1-title,
+    .tasks-embed .header-title { color: var(--ink) !important; }
+    .tasks-embed .card-sub,
+    .tasks-embed .task-text,
+    .tasks-embed .task-de,
+    .tasks-embed .jour1-text,
+    .tasks-embed .footer-summary,
+    .tasks-embed .level-label { color: var(--ink-soft) !important; }
+    .tasks-embed .task-ar { color: var(--ink-soft) !important; opacity: .8; }
+    .tasks-embed .task:hover,
+    .tasks-embed .jour1-item:hover { background: var(--paper-2) !important; }
+    .tasks-embed .btn-reset,
+    .tasks-embed .icon-btn {
+      background: var(--paper-2) !important;
+      border-color: var(--line) !important;
+      color: var(--ink) !important;
+    }
+    .tasks-embed .level-pill {
+      background: var(--paper-2) !important;
+      border-color: var(--line) !important;
+      color: var(--ink-soft) !important;
+    }
+    .tasks-embed .jour1-wrap {
+      background: var(--card) !important;
+      border-color: var(--line) !important;
+    }
+    .tasks-embed .report-panel {
+      background: var(--card) !important;
+      border-color: var(--line) !important;
+    }
+    .tasks-embed .toast {
+      background: var(--card) !important;
+      border-color: var(--line) !important;
+      color: var(--ink) !important;
+    }
+    .tasks-embed .global-bar-wrap,
+    .tasks-embed .mini-bar,
+    .tasks-embed .jour1-bar {
+      background: var(--line) !important;
+    }
+    .tasks-embed .header-date { color: var(--ink-soft) !important; }
+    .tasks-embed .task-check {
+      border-color: var(--line) !important;
+    }
+    .tasks-embed .jour1-check {
+      border-color: var(--line) !important;
+    }
+    .tasks-embed .task-dur,
+    .tasks-embed .jour1-dur { color: var(--ink-soft) !important; }
+  `;
+
   app.innerHTML = `<div class="tasks-embed fade" style="max-width:1080px;margin:0 auto;padding:12px 0 40px">
     <style>${taskStyles}</style>
     ${bodyContent}
   </div>`;
 
-  // Run the embedded scripts
+  // Run embedded scripts
   const scripts = TASKS_HTML.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
   scripts.forEach(scriptTag => {
     const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
-    try { new Function(code)(); } catch(e) { console.warn('Task script error:', e); }
+    try { new Function(code)(); } catch(e) { console.warn('Task script:', e); }
   });
 }
+
 
 /* ════════ HOME ════════ */
 
@@ -3669,6 +3742,7 @@ function adjPaint(){
         <div class="adj-ex-de">${current.ex}</div>
         <div class="adj-ex-ar">${current.exAr}</div>
       </div>
+      <button id="adjNextBtn" class="adj-next-btn" style="display:none">التالي · Weiter →</button>
     </div>`;
 }
 
@@ -3692,7 +3766,12 @@ function adjAnswer(btn,correct){
   }
   const ex=document.getElementById('adjExReveal');
   if(ex)ex.style.display='block';
-  setTimeout(()=>{adjState.idx++;adjState.answered=false;adjPaint();},isCorrect?800:1500);
+  // Show "Next" button instead of auto-advancing
+  const nextBtn=document.getElementById('adjNextBtn');
+  if(nextBtn){
+    nextBtn.style.display='flex';
+    nextBtn.onclick=()=>{adjState.idx++;adjState.answered=false;adjPaint();};
+  }
 }
 
 function adjDone(m){
