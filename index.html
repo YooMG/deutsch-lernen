@@ -774,7 +774,8 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-check-btn:hover{background:var(--green)}
 .tts-replay-btn{display:none;background:var(--card);border:1.5px solid var(--line);color:var(--ink-soft);border-radius:10px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;align-items:center;gap:5px}
 .tts-replay-btn:hover{border-color:var(--teal);color:var(--teal)}
-.tts-next-btn{display:none;background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 20px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.tts-next-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:8px 20px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.tts-next-btn.visible{display:inline-block}
 .tts-next-btn:hover{filter:brightness(1.1)}
 .tts-hint-txt{font-size:11px;color:var(--ink-soft);margin-inline-start:auto}
 .tts-complete{text-align:center;padding:20px 16px;background:color-mix(in srgb,var(--green) 8%,var(--card));border-radius:14px;margin-top:8px}
@@ -3222,7 +3223,7 @@ function ttsBuildCard(item,i){
           <button class="tts-check-btn" id="tts-check-btn-${i}" onclick="ttsCheckAnswer(${i})">✓ تحقق</button>
           <button class="tts-hint-req-btn" id="tts-hint-req-btn-${i}" onclick="ttsRequestHint(${i})" style="background:none;border:1.5px solid color-mix(in srgb,var(--amber) 50%,var(--line));color:var(--amber);border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s">💡 تلميح</button>
           <button class="tts-replay-btn" id="tts-replay-btn-${i}" onclick="ttsSentReplay(${i})">🔁 أعد</button>
-          <button class="tts-next-btn" id="tts-next-btn-${i}" onclick="ttsSentNext(${i})">التالية ←</button>
+          <button class="tts-next-btn" id="tts-next-btn-${i}" onclick="ttsSentNext(${i})" style="display:none">التالية ←</button>
           <span class="tts-hint-txt" id="tts-kb-hint-${i}">Enter = تحقق</span>
         </div>
         <div id="tts-complete-${i}" style="display:none"></div>
@@ -3310,7 +3311,7 @@ function ttsShowPostPlay(i){
     if(hintReqBtn)hintReqBtn.style.display='none';
   }
   if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='';
+  if(nextBtn)nextBtn.style.display='inline-block';
 }
 
 /* ── Replay once (no loop) ── */
@@ -3381,7 +3382,7 @@ function ttsCheckAnswer(i){
   if(inp)inp.disabled=true;
   if(checkBtn)checkBtn.style.display='none';
   if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='';
+  if(nextBtn)nextBtn.style.display='inline-block';
   if(kbHint)kbHint.textContent='Shift+Enter = التالية';
 
   if(ok){
