@@ -1133,7 +1133,29 @@ const SUN='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 
 const MOON='<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 let theme=localStorage.getItem(TKEY)||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
 function applyTheme(){document.body.dataset.theme=theme;themeBtn.innerHTML=theme==='dark'?SUN:MOON;}
-themeBtn.onclick=()=>{theme=theme==='dark'?'light':'dark';try{localStorage.setItem(TKEY,theme)}catch(e){}applyTheme();if(view==='tasks')renderTasks();};
+themeBtn.onclick=()=>{
+  theme=theme==='dark'?'light':'dark';
+  try{localStorage.setItem(TKEY,theme)}catch(e){}
+  applyTheme();
+  if(view==='tasks'){
+    const embed=document.querySelector('.tasks-embed');
+    if(embed){
+      // Just update the style tag in place — no re-render, no state loss
+      const styleEl=embed.querySelector('style');
+      if(styleEl){
+        const isDark=theme==='dark';
+        let s=styleEl.textContent;
+        if(isDark){
+          s=s.replace('--bg: var(--paper);','--bg: var(--paper);')
+            .replace('--bg-card: var(--card);','--bg-card: var(--card);');
+          styleEl.textContent=s;
+        }
+      }
+    } else {
+      renderTasks();
+    }
+  }
+};
 
 /* ---- state ---- */
 let view='home';
