@@ -3373,32 +3373,35 @@ function ttsCheckAnswer(i){
   const sentences=ttsSplitSentences(ttsItems[i]?.text||'');const correct=sentences[st.sentIdx]||'';
   const inp=document.getElementById('tts-input-'+i);const userVal=(inp?.value||'').trim();
   const ok=ttsNormalize(userVal)===ttsNormalize(correct);st.scores[st.sentIdx]=ok;
-  const area=document.getElementById('tts-input-area-'+i);const fb=document.getElementById('tts-feedback-'+i);
+  const area=document.getElementById('tts-input-area-'+i);
+  const fb=document.getElementById('tts-feedback-'+i);
   const checkBtn=document.getElementById('tts-check-btn-'+i);
   const replayBtn=document.getElementById('tts-replay-btn-'+i);
   const nextBtn=document.getElementById('tts-next-btn-'+i);
   const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
   const kbHint=document.getElementById('tts-kb-hint-'+i);
+
+  // stop audio when user submits
+  window.speechSynthesis.cancel();
+  if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
+  ttsUpdateButtons(i,'▶',false);
+
   if(inp)inp.disabled=true;
   if(checkBtn)checkBtn.style.display='none';
   if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='inline-block';
+  if(nextBtn)nextBtn.style.display='inline-block';   // ← always show immediately
   if(kbHint)kbHint.textContent='Shift+Enter = التالية';
 
   if(ok){
-    // ✅ CORRECT
     if(area)area.className='tts-input-area tts-correct';
     if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML='✅ Richtig! أحسنت!';}
     if(hintReqBtn)hintReqBtn.style.display='none';
     const hintArea=document.getElementById('tts-hint-'+i);if(hintArea)hintArea.classList.remove('visible');
   } else {
-    // ❌ WRONG
     if(area)area.className='tts-input-area tts-wrong';
     if(fb){fb.className='tts-feedback tts-fb-wrong';fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct);}
     if(inp)inp.value=correct;
-    // Always show hint button — user decides whether to open it
     if(hintReqBtn)hintReqBtn.style.display='';
-    // ONLY auto-reveal hint if input was completely empty
     if(userVal===''){
       if(hintReqBtn)hintReqBtn.style.display='none';
       st.hintLevel=0;
