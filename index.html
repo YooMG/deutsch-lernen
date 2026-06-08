@@ -3179,7 +3179,7 @@ function ttsPlaySentence(i){
   u.onstart=()=>{ttsStartTime=performance.now();ttsRafLoop(i);ttsUpdateButtons(i,'⏸',true);};
   u.onend=()=>{if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}ttsIsPaused=false;ttsUpdateButtons(i,'▶',false);ttsUpdateProgress(i,ttsDuration,ttsDuration);ttsShowPostPlay(i);};
   u.onerror=(e)=>{if(e.error==='interrupted')return;if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}ttsUpdateButtons(i,'▶',false);};
-  ttsKeepAlive(i);window.speechSynthesis.speak(u);ttsUpdateButtons(i,'⏸',true);
+  window.speechSynthesis.speak(u);ttsUpdateButtons(i,'⏸',true);
   const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
 }
 
@@ -3274,17 +3274,21 @@ function ttsCheckAnswer(i){
     if(area)area.className='tts-input-area tts-correct';
     if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML='✅ Richtig! أحسنت!';}
     if(hintReqBtn)hintReqBtn.style.display='none';
-    // hide hint area if it was open
     const hintArea=document.getElementById('tts-hint-'+i);if(hintArea)hintArea.classList.remove('visible');
   } else {
-    // ❌ WRONG — show diff + auto-show first hint level
+    // ❌ WRONG — show diff
     if(area)area.className='tts-input-area tts-wrong';
     if(fb){fb.className='tts-feedback tts-fb-wrong';fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct);}
     if(inp)inp.value=correct;
-    if(hintReqBtn)hintReqBtn.style.display='none'; // replace with inline hint
-    // auto-show hint level 1
-    st.hintLevel=0;
-    ttsShowHint(i,correct,1);
+    // show hint ONLY if user wrote nothing (empty input)
+    if(userVal.trim()===''){
+      if(hintReqBtn)hintReqBtn.style.display='none';
+      st.hintLevel=0;
+      ttsShowHint(i,correct,1);
+    } else {
+      // user wrote something but wrong — keep hint button available
+      if(hintReqBtn)hintReqBtn.style.display='';
+    }
   }
   const dot=document.getElementById('tts-dot-'+i+'-'+st.sentIdx);if(dot)dot.className='tts-sent-dot '+(ok?'done-ok':'done-wrong');
 }
