@@ -1207,9 +1207,15 @@ function updateGlobalTree(){
 
 function render(){
   updateGlobalTree();
+  // Tasks uses a persistent container to preserve JS state
+  const tasksCont = document.getElementById('tasksPersist');
+  if(tasksCont){
+    tasksCont.style.display = view==='tasks' ? '' : 'none';
+  }
+  app.style.display = view==='tasks' ? 'none' : '';
+  if(view==='tasks') return renderTasks();
   if(view==='home')return renderHome();
   if(view==='words')return renderWords();
-  if(view==='tasks')return renderTasks();
   if(view==='horen')return renderHoren();
   if(view==='schreiben')return renderSchreiben();
   if(view==='adjektive')return renderAdjektive();
@@ -1219,6 +1225,11 @@ function render(){
 
 /* daily tasks embedded app */
 function renderTasks(){
+  // If tasks already rendered, just re-show the existing DOM (preserve state)
+  if(window._tasksInitialized && document.getElementById('grid')){
+    return; // already rendered, state preserved
+  }
+
   const isDark = document.body.dataset.theme === 'dark';
 
   // Extract body content from TASKS_HTML
@@ -1327,7 +1338,14 @@ function renderTasks(){
     .tasks-embed .jour1-dur { color: var(--ink-soft) !important; }
   `;
 
-  app.innerHTML = `<div class="tasks-embed fade" style="max-width:1080px;margin:0 auto;padding:12px 0 40px">
+  let tasksCont = document.getElementById('tasksPersist');
+  if(!tasksCont){
+    tasksCont = document.createElement('div');
+    tasksCont.id = 'tasksPersist';
+    tasksCont.style.cssText = 'flex:1;overflow-y:auto;';
+    app.parentNode.insertBefore(tasksCont, app.nextSibling);
+  }
+  tasksCont.innerHTML = `<div class="tasks-embed fade" style="max-width:1080px;margin:0 auto;padding:12px 0 40px">
     <style>${taskStyles}</style>
     ${bodyContent}
   </div>`;
@@ -1338,6 +1356,14 @@ function renderTasks(){
     const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
     try { new Function(code)(); } catch(e) { console.warn('Task script:', e); }
   });
+  window._tasksInitialized = true;
+  // Hook into resetAll to allow re-initialization if needed
+  const _origReset = window.resetAll;
+  if(_origReset){
+    window.resetAll = function(){
+      _origReset();
+    };
+  }
 }
 
 
