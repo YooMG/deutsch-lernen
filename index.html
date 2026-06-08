@@ -3531,14 +3531,9 @@ function ttsHandleKey(e,i){
     e.preventDefault();
     const st=ttsGetState(i);
     if(!st.checked)ttsCheckAnswer(i);
-    // if correct, auto-advance after brief pause
     else if(st.scores[st.sentIdx]===true)ttsSentNext(i);
   }
   if(e.key==='Enter'&&e.shiftKey){e.preventDefault();const st=ttsGetState(i);if(st.checked)ttsSentNext(i);}
-  // H key = hint shortcut
-  if(e.key.toLowerCase()==='h'&&!e.ctrlKey&&!e.metaKey&&e.target.value===''&&!ttsGetState(i).checked){
-    e.preventDefault();ttsRequestHint(i);
-  }
 }
 
 /* ── RAF loop + progress ── */
