@@ -1443,12 +1443,24 @@ function renderTasks(){
     ${bodyContent}
   </div>`;
 
-  // Run embedded scripts
-  const scripts = TASKS_HTML.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
-  scripts.forEach(scriptTag => {
-    const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
-    try { new Function(code)(); } catch(e) { console.warn('Task script:', e); }
-  });
+  // Run embedded scripts by injecting into DOM (gives proper window scope)
+  // Only inject once — subsequent visits reuse the already-injected functions
+  if(!window._tasksScriptsInjected){
+    window._tasksScriptsInjected = true;
+    const scripts = TASKS_HTML.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
+    scripts.forEach(scriptTag => {
+      const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
+      try {
+        const s = document.createElement('script');
+        s.textContent = code;
+        document.head.appendChild(s);
+      } catch(e) { console.warn('Task script:', e); }
+    });
+  } else {
+    // Re-call render() to refresh UI with current state
+    if(typeof render === 'function') render();
+  }
+
   window._tasksInitialized = true;
   // Hook into resetAll to allow re-initialization if needed
   const _origReset = window.resetAll;
