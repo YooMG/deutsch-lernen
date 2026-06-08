@@ -1787,7 +1787,11 @@ function renderWords(){
     <button data-m="anki" class="${W.mode==='anki'?'active':''}" style="position:relative">🔁 مراجعة${dueCount>0?`<span style="position:absolute;top:-4px;inset-inline-end:-4px;background:var(--amber);color:#fff;border-radius:99px;font-size:9px;font-weight:800;padding:1px 5px">${dueCount}</span>`:''}</button>
   </div>`;
   app.innerHTML=`<div class="shell"><aside style="--accent:var(--blue)">${side}</aside><main style="--accent:var(--blue)">${srBanner}${modebar}<div id="wMain"></div></main></div>`;
-  app.querySelectorAll('.modebar button').forEach(b=>b.onclick=()=>{W.mode=b.dataset.m;fcReset();qz=null;renderWords()});
+  app.querySelectorAll('.modebar button').forEach(b=>b.onclick=()=>{
+    W.mode=b.dataset.m;
+    if(b.dataset.m==='quiz') W.onlyUnknown=true;  // default: unmastered only
+    fcReset();qz=null;renderWords();
+  });
   renderWSide();renderWMain();
   const wab=document.getElementById('wAddBtn');if(wab)wab.onclick=openAddWord;
   const wcb=document.getElementById('wAddCatBtn');if(wcb)wcb.onclick=openAddCategory;
@@ -1905,8 +1909,8 @@ function wQuiz(m){
   // unmastered toggle
   const unknownCount=sel.items.filter(e=>!wIsKnown(e.ci,e.i)).length;
   const unknownToggle=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-    <button class="pill ${W.onlyUnknown?'on':''}" id="wUnknownToggle" style="background:${W.onlyUnknown?'var(--rust)':''}">
-      🎯 الكلمات غير المتقنة فقط (${unknownCount})
+    <button class="pill ${W.onlyUnknown?'on':''}" id="wUnknownToggle" style="${W.onlyUnknown?'background:var(--rust)':''}">
+      ${W.onlyUnknown?`🎯 غير المتقنة فقط (${unknownCount})`:`📚 كل الكلمات (${sel.items.length})`}
     </button>
   </div>`;
   // determine pool + type + minimum for the chosen mode
