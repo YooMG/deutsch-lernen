@@ -542,6 +542,10 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .m-err{color:var(--rust);font-size:13px;font-weight:700;margin-top:8px;min-height:16px;text-align:center}
 .fade{animation:fade .35s ease}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .stagger>*{animation:fade .4s ease backwards}
+/* ── Page transition ── */
+#app,#tasksPersist{transition:opacity .18s ease,transform .18s ease}
+#app.page-exit,#tasksPersist.page-exit{opacity:0;transform:translateY(6px);pointer-events:none}
+#app.page-enter,#tasksPersist.page-enter{animation:fade .28s ease}
 
 /* ════════ AUTH OVERLAY ════════ */
 #authOverlay{position:fixed;inset:0;background:var(--paper);z-index:9999;display:flex;align-items:stretch;transition:opacity .35s}
@@ -1273,14 +1277,33 @@ const searchBox=document.getElementById('searchBox');
 const searchInput=document.getElementById('search');
 
 /* ---- router ---- */
-function setView(v){view=v;W.query='';V.query='';searchInput.value='';
+function setView(v){
+  if(v===view){return;} // same view, do nothing
+  view=v;W.query='';V.query='';searchInput.value='';
   if(v!=='words')W.onlyUnknown=false;
   if(v!=='verbs')V.onlyUnknown=false;
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   searchBox.classList.toggle('hidden',v==='home'||v==='tasks');
   if(v==='words'||v==='verbs')searchInput.placeholder=v==='words'?'ابحث بالعربية أو الألمانية…':'ابحث عن فعل أو معنى…';
   fcReset();qz=null;
-  render();window.scrollTo({top:0,behavior:'instant'});
+
+  // Fade-out current content
+  const containers=[app,document.getElementById('tasksPersist')].filter(Boolean);
+  containers.forEach(c=>c.classList.add('page-exit'));
+
+  setTimeout(()=>{
+    containers.forEach(c=>c.classList.remove('page-exit'));
+    render();
+    window.scrollTo({top:0,behavior:'instant'});
+    // Trigger fade-in on the visible container
+    const active=v==='tasks'?document.getElementById('tasksPersist'):app;
+    if(active){
+      active.classList.remove('page-enter');
+      void active.offsetWidth; // force reflow
+      active.classList.add('page-enter');
+      setTimeout(()=>active.classList.remove('page-enter'),300);
+    }
+  },160);
 }
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById('brand').onclick=()=>setView('home');
@@ -1317,6 +1340,26 @@ function render(){
 }
 
 /* daily tasks embedded app */
+window._appRender = null; // will be set after main render() is defined
+
+// On each page load, reset any "running" tasks to idle (they can't resume across sessions)
+(function(){
+  try{
+    const raw=localStorage.getItem('dt_tasks_v3');
+    if(raw){
+      const state=JSON.parse(raw);
+      let changed=false;
+      Object.keys(state).forEach(k=>{
+        if(state[k]&&state[k].running){
+          state[k].running=false;
+          changed=true;
+        }
+      });
+      if(changed)localStorage.setItem('dt_tasks_v3',JSON.stringify(state));
+    }
+  }catch(e){}
+})();
+
 function renderTasks(){
   // If tasks already rendered, just re-show the existing DOM (preserve state)
   if(window._tasksInitialized && document.getElementById('grid')){
@@ -1456,9 +1499,16 @@ function renderTasks(){
         document.head.appendChild(s);
       } catch(e) { console.warn('Task script:', e); }
     });
+    // After injection the tasks script calls render() itself at the end
+    // Store reference for re-use on subsequent visits
+    setTimeout(()=>{ if(window.render && window.render !== window._appRender) window._tasksRender = window.render; }, 50);
   } else {
-    // Re-call render() to refresh UI with current state
-    if(typeof render === 'function') render();
+    // Subsequent visit: re-draw grid and jour1 with fresh state
+    if(typeof window._tasksRender === 'function'){
+      window._tasksRender();
+    } else if(typeof window.render === 'function'){
+      try{ window.render(); }catch(e){}
+    }
   }
 
   window._tasksInitialized = true;
@@ -4261,7 +4311,7 @@ function changeLevelTo(lvl, el){
 }
 
 /* init */
-applyTheme();render();checkOnboarding();
+applyTheme();window._appRender=render;render();checkOnboarding();
 </script>
 <script>
 // ═══ AUTH GALAXY ANIMATION ═══
