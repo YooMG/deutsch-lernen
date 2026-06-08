@@ -783,6 +783,17 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-restart-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 22px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
 .tts-modal-textarea{width:100%;min-height:130px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);font-family:'Fraunces',serif;font-size:14px;color:var(--ink);outline:none;resize:vertical;line-height:1.7;direction:ltr;transition:.15s}
 .tts-modal-textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 12%,transparent)}
+/* hint area */
+.tts-hint-area{display:none;margin-top:10px;background:color-mix(in srgb,var(--amber) 10%,var(--card));border:1.5px solid color-mix(in srgb,var(--amber) 35%,var(--line));border-radius:12px;padding:10px 14px;direction:ltr}
+.tts-hint-area.visible{display:block}
+.tts-hint-label{font-size:10.5px;font-weight:800;color:var(--amber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.tts-hint-words{display:flex;flex-wrap:wrap;gap:7px}
+.tts-hint-word{display:flex;flex-direction:column;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer;transition:.15s}
+.tts-hint-word:hover{border-color:var(--amber);background:color-mix(in srgb,var(--amber) 8%,var(--card))}
+.tts-hint-word .hw-de{font-family:'Fraunces',serif;font-size:13.5px;font-weight:700;color:var(--ink)}
+.tts-hint-word .hw-pos{font-size:10px;color:var(--ink-soft);margin-top:1px}
+.tts-hint-btn{background:none;border:1px dashed color-mix(in srgb,var(--amber) 50%,var(--line));color:var(--amber);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;margin-top:8px}
+.tts-hint-btn:hover{background:color-mix(in srgb,var(--amber) 10%,var(--card))}
 
 /* ════════ HÖREN QUIZ PANEL ════════ */
 .hq-btn{display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#fff;border:none;border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s;white-space:nowrap}
@@ -3087,11 +3098,17 @@ function ttsBuildCard(item,i){
           <button class="tts-clear-btn" onclick="ttsClearInput(${i})" title="مسح">↻</button>
         </div>
         <div class="tts-feedback" id="tts-feedback-${i}"></div>
+        <div class="tts-hint-area" id="tts-hint-${i}">
+          <div class="tts-hint-label">💡 تلميح</div>
+          <div class="tts-hint-words" id="tts-hint-words-${i}"></div>
+          <button class="tts-hint-btn" id="tts-hint-more-${i}" onclick="ttsShowMoreHint(${i})" style="display:none">+ تلميح إضافي</button>
+        </div>
         <div class="tts-action-row">
           <button class="tts-check-btn" id="tts-check-btn-${i}" onclick="ttsCheckAnswer(${i})">✓ تحقق</button>
-          <button class="tts-replay-btn" id="tts-replay-btn-${i}" onclick="ttsSentReplay(${i})">🔁 أعد الجملة</button>
+          <button class="tts-hint-req-btn" id="tts-hint-req-btn-${i}" onclick="ttsRequestHint(${i})" style="background:none;border:1.5px solid color-mix(in srgb,var(--amber) 50%,var(--line));color:var(--amber);border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s">💡 تلميح</button>
+          <button class="tts-replay-btn" id="tts-replay-btn-${i}" onclick="ttsSentReplay(${i})">🔁 أعد</button>
           <button class="tts-next-btn" id="tts-next-btn-${i}" onclick="ttsSentNext(${i})">التالية ←</button>
-          <span class="tts-hint-txt">Enter = تحقق · Shift+Enter = التالية</span>
+          <span class="tts-hint-txt" id="tts-kb-hint-${i}">Enter = تحقق</span>
         </div>
         <div id="tts-complete-${i}" style="display:none"></div>
       </div>
@@ -3132,10 +3149,15 @@ function ttsRenderDictationState(i){
   const inp=document.getElementById('tts-input-'+i);const area=document.getElementById('tts-input-area-'+i);
   const fb=document.getElementById('tts-feedback-'+i);const checkBtn=document.getElementById('tts-check-btn-'+i);
   const replayBtn=document.getElementById('tts-replay-btn-'+i);const nextBtn=document.getElementById('tts-next-btn-'+i);
+  const hintArea=document.getElementById('tts-hint-'+i);const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
+  const kbHint=document.getElementById('tts-kb-hint-'+i);
   if(inp){inp.value='';inp.disabled=false;}if(area)area.className='tts-input-area';
   if(fb){fb.textContent='';fb.className='tts-feedback';}
+  if(hintArea)hintArea.classList.remove('visible');
+  if(hintReqBtn)hintReqBtn.style.display='';
   if(checkBtn)checkBtn.style.display='';if(replayBtn)replayBtn.style.display='none';if(nextBtn)nextBtn.style.display='none';
-  st.checked=false;
+  if(kbHint)kbHint.textContent='Enter = تحقق';
+  st.checked=false;st.hintLevel=0;
   sentences.forEach((_,k)=>{const p=document.getElementById('tts-ts-'+i+'-'+k);if(p)p.style.background=k===si?'color-mix(in srgb,var(--teal) 15%,var(--card))':'';});
   setTimeout(()=>inp?.focus(),300);
 }
@@ -3167,7 +3189,11 @@ function ttsShowPostPlay(i){
   const checkBtn=document.getElementById('tts-check-btn-'+i);
   const replayBtn=document.getElementById('tts-replay-btn-'+i);
   const nextBtn=document.getElementById('tts-next-btn-'+i);
-  if(st.checked)if(checkBtn)checkBtn.style.display='none';
+  const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
+  if(st.checked){
+    if(checkBtn)checkBtn.style.display='none';
+    if(hintReqBtn)hintReqBtn.style.display='none';
+  }
   if(replayBtn)replayBtn.style.display='flex';
   if(nextBtn)nextBtn.style.display='';
 }
@@ -3232,10 +3258,34 @@ function ttsCheckAnswer(i){
   const inp=document.getElementById('tts-input-'+i);const userVal=(inp?.value||'').trim();
   const ok=ttsNormalize(userVal)===ttsNormalize(correct);st.scores[st.sentIdx]=ok;
   const area=document.getElementById('tts-input-area-'+i);const fb=document.getElementById('tts-feedback-'+i);
-  const checkBtn=document.getElementById('tts-check-btn-'+i);const replayBtn=document.getElementById('tts-replay-btn-'+i);const nextBtn=document.getElementById('tts-next-btn-'+i);
-  if(inp)inp.disabled=true;if(checkBtn)checkBtn.style.display='none';if(replayBtn)replayBtn.style.display='flex';if(nextBtn)nextBtn.style.display='';
-  if(ok){if(area)area.className='tts-input-area tts-correct';if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML='✅ Richtig!';}}
-  else{if(area)area.className='tts-input-area tts-wrong';if(fb){fb.className='tts-feedback tts-fb-wrong';fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct);}if(inp)inp.value=correct;}
+  const checkBtn=document.getElementById('tts-check-btn-'+i);
+  const replayBtn=document.getElementById('tts-replay-btn-'+i);
+  const nextBtn=document.getElementById('tts-next-btn-'+i);
+  const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
+  const kbHint=document.getElementById('tts-kb-hint-'+i);
+  if(inp)inp.disabled=true;
+  if(checkBtn)checkBtn.style.display='none';
+  if(replayBtn)replayBtn.style.display='flex';
+  if(nextBtn)nextBtn.style.display='';
+  if(kbHint)kbHint.textContent='Shift+Enter = التالية';
+
+  if(ok){
+    // ✅ CORRECT — hide hint button, show green
+    if(area)area.className='tts-input-area tts-correct';
+    if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML='✅ Richtig! أحسنت!';}
+    if(hintReqBtn)hintReqBtn.style.display='none';
+    // hide hint area if it was open
+    const hintArea=document.getElementById('tts-hint-'+i);if(hintArea)hintArea.classList.remove('visible');
+  } else {
+    // ❌ WRONG — show diff + auto-show first hint level
+    if(area)area.className='tts-input-area tts-wrong';
+    if(fb){fb.className='tts-feedback tts-fb-wrong';fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct);}
+    if(inp)inp.value=correct;
+    if(hintReqBtn)hintReqBtn.style.display='none'; // replace with inline hint
+    // auto-show hint level 1
+    st.hintLevel=0;
+    ttsShowHint(i,correct,1);
+  }
   const dot=document.getElementById('tts-dot-'+i+'-'+st.sentIdx);if(dot)dot.className='tts-sent-dot '+(ok?'done-ok':'done-wrong');
 }
 function ttsDiffHTML(user,correct){
@@ -3247,15 +3297,130 @@ function ttsDiffHTML(user,correct){
     else out+=`<span class="tts-diff-bad">${u}</span><span class="tts-diff-fix"> ${c}</span> `;
   }return out.trim();
 }
+/* ── Hint system ── */
+// hintLevel 0=none, 1=first word, 2=first 2 words, 3=all words shown
+function ttsRequestHint(i){
+  const st=ttsGetState(i);if(st.checked)return;
+  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');const correct=sentences[st.sentIdx]||'';
+  st.hintLevel=(st.hintLevel||0)+1;
+  ttsShowHint(i,correct,st.hintLevel);
+  // hide the hint-req button after first press (more hint btn takes over)
+  const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
+  if(hintReqBtn)hintReqBtn.style.display='none';
+}
+
+function ttsShowHint(i,correct,level){
+  const hintArea=document.getElementById('tts-hint-'+i);
+  const wordsEl=document.getElementById('tts-hint-words-'+i);
+  const moreBtn=document.getElementById('tts-hint-more-'+i);
+  if(!hintArea||!wordsEl)return;
+
+  // get clean words (strip punctuation)
+  const words=correct.trim().split(/\s+/).filter(Boolean);
+  const total=words.length;
+
+  // how many words to reveal at each level
+  // level 1: reveal 1st word
+  // level 2: reveal first ~half
+  // level 3: reveal all (as masked blanks → underscores)
+  let reveal=0;
+  if(level===1)reveal=1;
+  else if(level===2)reveal=Math.max(2,Math.ceil(total/2));
+  else reveal=total;
+
+  hintArea.classList.add('visible');
+
+  // Build word pills
+  wordsEl.innerHTML=words.map((w,idx)=>{
+    const clean=w.replace(/[.,!?;:]/g,'');
+    const punct=w.slice(clean.length);
+    if(idx<reveal){
+      // revealed word — show it
+      const pos=ttsGetWordType(clean,idx,total);
+      return `<div class="tts-hint-word" onclick="ttsInsertHintWord(${i},'${clean.replace(/'/g,"\\'")}')">
+        <span class="hw-de">${escHtml(clean)}${punct}</span>
+        <span class="hw-pos">${pos}</span>
+      </div>`;
+    } else {
+      // hidden word — show blank dashes
+      const dashes='_'.repeat(Math.max(2,clean.length));
+      return `<div class="tts-hint-word" style="opacity:.4;cursor:default">
+        <span class="hw-de" style="letter-spacing:3px;color:var(--ink-soft)">${dashes}</span>
+        <span class="hw-pos">Wort ${idx+1}</span>
+      </div>`;
+    }
+  }).join('');
+
+  // show "more hint" button if there are still hidden words
+  if(reveal<total&&moreBtn){
+    moreBtn.style.display='';
+    moreBtn.textContent=level===1?'+ اكشف نصف الجملة':'+ اكشف كل الجملة';
+  } else if(moreBtn){
+    moreBtn.style.display='none';
+  }
+}
+
+function ttsShowMoreHint(i){
+  const st=ttsGetState(i);
+  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');const correct=sentences[st.sentIdx]||'';
+  st.hintLevel=(st.hintLevel||1)+1;
+  ttsShowHint(i,correct,st.hintLevel);
+}
+
+// Clicking a hint word inserts it into the input
+function ttsInsertHintWord(i,word){
+  const inp=document.getElementById('tts-input-'+i);if(!inp||inp.disabled)return;
+  const cur=inp.value;
+  const needSpace=cur.length>0&&!cur.endsWith(' ');
+  inp.value=cur+(needSpace?' ':'')+word+' ';
+  inp.focus();
+  // put cursor at end
+  inp.selectionStart=inp.selectionEnd=inp.value.length;
+}
+
+// Guess grammatical position label for a word
+function ttsGetWordType(word,idx,total){
+  if(idx===0)return 'Satzanfang';
+  const w=word.toLowerCase();
+  // articles
+  if(['der','die','das','ein','eine','einen','einem','einer','des','dem','den'].includes(w))return 'Artikel';
+  // common prepositions
+  if(['in','auf','an','mit','zu','von','aus','bei','nach','über','unter','vor','hinter','neben','zwischen','durch','für','um','ohne','gegen','seit'].includes(w))return 'Präposition';
+  // common conjunctions
+  if(['und','oder','aber','denn','weil','dass','wenn','ob','als','obwohl','damit','sodass','sondern'].includes(w))return 'Konjunktion';
+  // pronouns
+  if(['ich','du','er','sie','es','wir','ihr','man','mich','dich','sich','uns','euch','mir','dir','ihm','ihr','uns'].includes(w))return 'Pronomen';
+  // modal/aux verbs
+  if(['bin','bist','ist','sind','seid','war','waren','habe','hast','hat','haben','habt','hatte','hatten','wird','werden','kann','kannst','können','muss','müssen','soll','darf'].includes(w))return 'Verb';
+  // capitalized = likely noun
+  if(word[0]===word[0].toUpperCase()&&idx>0)return 'Nomen';
+  if(idx===total-1)return 'Satzende';
+  return 'Wort';
+}
+
 function ttsClearInput(i){
   const inp=document.getElementById('tts-input-'+i);const area=document.getElementById('tts-input-area-'+i);const fb=document.getElementById('tts-feedback-'+i);
   if(inp){inp.value='';inp.disabled=false;inp.focus();}if(area)area.className='tts-input-area';if(fb){fb.textContent='';fb.className='tts-feedback';}
-  const st=ttsGetState(i);st.checked=false;const checkBtn=document.getElementById('tts-check-btn-'+i);const nextBtn=document.getElementById('tts-next-btn-'+i);
+  const st=ttsGetState(i);st.checked=false;
+  const checkBtn=document.getElementById('tts-check-btn-'+i);const nextBtn=document.getElementById('tts-next-btn-'+i);
+  const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
   if(checkBtn)checkBtn.style.display='';if(nextBtn)nextBtn.style.display='none';
+  if(hintReqBtn)hintReqBtn.style.display='';
+  // keep hint visible if it was shown (user already asked for it)
 }
 function ttsHandleKey(e,i){
-  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const st=ttsGetState(i);if(!st.checked)ttsCheckAnswer(i);}
+  if(e.key==='Enter'&&!e.shiftKey){
+    e.preventDefault();
+    const st=ttsGetState(i);
+    if(!st.checked)ttsCheckAnswer(i);
+    // if correct, auto-advance after brief pause
+    else if(st.scores[st.sentIdx]===true)ttsSentNext(i);
+  }
   if(e.key==='Enter'&&e.shiftKey){e.preventDefault();const st=ttsGetState(i);if(st.checked)ttsSentNext(i);}
+  // H key = hint shortcut
+  if(e.key.toLowerCase()==='h'&&!e.ctrlKey&&!e.metaKey&&e.target.value===''&&!ttsGetState(i).checked){
+    e.preventDefault();ttsRequestHint(i);
+  }
 }
 
 /* ── RAF loop + progress ── */
