@@ -1494,6 +1494,8 @@ function renderTasks(){
   // Only inject once — subsequent visits reuse the already-injected functions
   if(!window._tasksScriptsInjected){
     window._tasksScriptsInjected = true;
+    // Save app render BEFORE injecting tasks script (which redefines render)
+    const _savedAppRender = window.render;
     const scripts = TASKS_HTML.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
     scripts.forEach(scriptTag => {
       const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
@@ -1503,15 +1505,13 @@ function renderTasks(){
         document.head.appendChild(s);
       } catch(e) { console.warn('Task script:', e); }
     });
-    // After injection the tasks script calls render() itself at the end
-    // Store reference for re-use on subsequent visits
-    setTimeout(()=>{ if(window.render && window.render !== window._appRender) window._tasksRender = window.render; }, 50);
+    // The tasks script overwrote window.render — capture it then restore the app one
+    window._tasksRender = window.render;
+    window.render = _savedAppRender;
   } else {
     // Subsequent visit: re-draw grid and jour1 with fresh state
     if(typeof window._tasksRender === 'function'){
-      window._tasksRender();
-    } else if(typeof window.render === 'function'){
-      try{ window.render(); }catch(e){}
+      try{ window._tasksRender(); }catch(e){}
     }
   }
 
@@ -4315,7 +4315,7 @@ function changeLevelTo(lvl, el){
 }
 
 /* init */
-applyTheme();window._appRender=render;render();checkOnboarding();
+applyTheme();window._appRender=render;window.render=render;render();checkOnboarding();
 </script>
 <script>
 // ═══ AUTH GALAXY ANIMATION ═══
