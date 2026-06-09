@@ -1278,7 +1278,7 @@ const searchInput=document.getElementById('search');
 
 /* ---- router ---- */
 function setView(v){
-  if(v===view){return;} // same view, do nothing
+  if(v===view){return;}
   view=v;W.query='';V.query='';searchInput.value='';
   if(v!=='words')W.onlyUnknown=false;
   if(v!=='verbs')V.onlyUnknown=false;
@@ -1287,23 +1287,30 @@ function setView(v){
   if(v==='words'||v==='verbs')searchInput.placeholder=v==='words'?'ابحث بالعربية أو الألمانية…':'ابحث عن فعل أو معنى…';
   fcReset();qz=null;
 
-  // Fade-out current content
-  const containers=[app,document.getElementById('tasksPersist')].filter(Boolean);
-  containers.forEach(c=>c.classList.add('page-exit'));
+  _transitioning=true;
+
+  // ── Immediately hide the non-active container (prevents flash) ──
+  const tasksCont=document.getElementById('tasksPersist');
+  if(tasksCont) tasksCont.style.display=v==='tasks'?'':'none';
+  app.style.display=v==='tasks'?'none':'';
+
+  // Fade-out the outgoing container
+  const outgoing=v==='tasks'?app:(tasksCont||app);
+  outgoing.classList.add('page-exit');
 
   setTimeout(()=>{
-    containers.forEach(c=>c.classList.remove('page-exit'));
+    outgoing.classList.remove('page-exit');
+    _transitioning=false;
     render();
     window.scrollTo({top:0,behavior:'instant'});
-    // Trigger fade-in on the visible container
-    const active=v==='tasks'?document.getElementById('tasksPersist'):app;
-    if(active){
-      active.classList.remove('page-enter');
-      void active.offsetWidth; // force reflow
-      active.classList.add('page-enter');
-      setTimeout(()=>active.classList.remove('page-enter'),300);
+    // Fade-in the incoming container
+    const incoming=v==='tasks'?(tasksCont||app):app;
+    if(incoming){
+      void incoming.offsetWidth;
+      incoming.classList.add('page-enter');
+      setTimeout(()=>incoming.classList.remove('page-enter'),300);
     }
-  },160);
+  },150);
 }
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById('brand').onclick=()=>setView('home');
@@ -1321,14 +1328,15 @@ function updateGlobalTree(){
   if(el)el.innerHTML=buildTreeSVG(tp,wp,vp);
 }
 
+let _transitioning=false;
 function render(){
   updateGlobalTree();
-  // Tasks uses a persistent container to preserve JS state
-  const tasksCont = document.getElementById('tasksPersist');
-  if(tasksCont){
-    tasksCont.style.display = view==='tasks' ? '' : 'none';
+  // During setView transition, display is already managed — skip here
+  if(!_transitioning){
+    const tasksCont=document.getElementById('tasksPersist');
+    if(tasksCont) tasksCont.style.display=view==='tasks'?'':'none';
+    app.style.display=view==='tasks'?'none':'';
   }
-  app.style.display = view==='tasks' ? 'none' : '';
   if(view==='tasks') return renderTasks();
   if(view==='home')return renderHome();
   if(view==='words')return renderWords();
