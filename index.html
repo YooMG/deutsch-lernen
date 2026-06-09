@@ -724,7 +724,7 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-del-btn{background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:5px;border-radius:8px;transition:.15s;font-size:15px;flex:none;align-self:flex-start}
 .tts-del-btn:hover{color:#c0392b;background:rgba(192,57,43,.1)}
 .tts-player{padding:8px 14px 14px;border-top:1px solid var(--line)}
-.tts-waveform{height:64px;background:var(--paper-2);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden;padding:8px 12px;position:relative;cursor:pointer;border:1px solid var(--line)}
+.tts-waveform{height:64px;background:var(--paper-2);border-radius:10px;margin-bottom:6px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden;padding:8px 12px;position:relative;cursor:pointer;border:1px solid var(--line);direction:ltr}
 .tts-bar{width:3px;border-radius:2px;background:color-mix(in srgb,var(--ink-soft) 30%,transparent);transition:background .12s;flex:none}
 .tts-bar.played{background:var(--teal)}
 .tts-bar.current-sentence{background:var(--rust)}
@@ -735,9 +735,9 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-waveform.tts-wf-active .tts-bar.played:nth-child(3n){animation-delay:.3s}
 .tts-waveform.tts-wf-active .tts-bar.played:nth-child(4n){animation-delay:.45s}
 @keyframes ttsBarPulse{0%,100%{background:#4ba3b3;transform:scaleY(.4)}50%{background:#2f7d8a;transform:scaleY(1)}}
-.tts-progress-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:#333}
+.tts-progress-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(0,0,0,0.08);direction:ltr}
 .tts-progress-fill{height:100%;background:var(--teal);width:0%;transition:width .3s linear}
-.tts-time-row{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-bottom:8px;font-variant-numeric:tabular-nums;direction:ltr}
+.tts-time-row{display:flex;flex-direction:row;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-bottom:8px;font-variant-numeric:tabular-nums;direction:ltr}
 .tts-controls{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px}
 .tts-play-btn{width:40px;height:40px;border-radius:50%;background:var(--teal);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex:none}
 .tts-play-btn:hover{background:var(--green);transform:scale(1.08)}
@@ -3694,7 +3694,7 @@ function ttsPlaySentence(i){
     ttsIsPaused=false;st.paused=false;
 
     // Determine start and end times for THIS sentence
-    let startTime = 0, endTime = audio.duration || 0;
+    let startTime = 0, endTime = Infinity;
     const srtCues = item.srtCues;
     if(srtCues && srtCues[si]){
       startTime = srtCues[si].start;
@@ -3704,9 +3704,11 @@ function ttsPlaySentence(i){
       const timings = _ttsTimingsCache[item.id];
       if(timings && timings[si]!=null){
         startTime = timings[si];
-        endTime = timings[si+1] != null ? timings[si+1] : (audio.duration || 0);
+        endTime = timings[si+1] != null ? timings[si+1] : (audio.duration || Infinity);
       }
     }
+
+    console.log('[TTS] play sentence', si+1, 'from', startTime, 'to', endTime, 'srtCues:', !!srtCues);
 
     // Seek to sentence start
     audio.currentTime = startTime;
@@ -3716,21 +3718,25 @@ function ttsPlaySentence(i){
       const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
     };
 
-    // Stop at sentence boundary
+    // Use a flag to prevent multiple stop triggers
+    let stopped = false;
     audio.ontimeupdate=()=>{
+      if(stopped)return;
       ttsElapsed=audio.currentTime;
       ttsUpdateProgress(i,audio.currentTime,audio.duration||0);
       // STOP when we reach the end of the current sentence
-      if(audio.currentTime >= endTime - 0.05){
+      if(audio.currentTime >= endTime){
+        stopped = true;
         audio.pause();
         ttsIsPaused=true;
         st.paused=true;
         ttsUpdateButtons(i,'▶',false);
-        // Show post-play UI (replay / check / input)
         ttsShowPostPlay(i);
       }
     };
     audio.onended=()=>{
+      if(stopped)return;
+      stopped = true;
       ttsIsPaused=false;ttsUpdateButtons(i,'▶',false);
       ttsShowPostPlay(i);
     };
