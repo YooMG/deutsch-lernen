@@ -1277,40 +1277,37 @@ const searchBox=document.getElementById('searchBox');
 const searchInput=document.getElementById('search');
 
 /* ---- router ---- */
+let _transitioning=false;
 function setView(v){
-  if(v===view){return;}
-  view=v;W.query='';V.query='';searchInput.value='';
-  if(v!=='words')W.onlyUnknown=false;
-  if(v!=='verbs')V.onlyUnknown=false;
+  if(v===view) return;
+  view=v; W.query=''; V.query=''; searchInput.value='';
+  if(v!=='words') W.onlyUnknown=false;
+  if(v!=='verbs') V.onlyUnknown=false;
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   searchBox.classList.toggle('hidden',v==='home'||v==='tasks');
-  if(v==='words'||v==='verbs')searchInput.placeholder=v==='words'?'ابحث بالعربية أو الألمانية…':'ابحث عن فعل أو معنى…';
-  fcReset();qz=null;
+  if(v==='words'||v==='verbs') searchInput.placeholder=v==='words'?'ابحث بالعربية أو الألمانية…':'ابحث عن فعل أو معنى…';
+  fcReset(); qz=null;
 
-  _transitioning=true;
-
-  // ── Immediately hide the non-active container (prevents flash) ──
+  // Hide BOTH containers immediately — no flash possible
+  app.style.display='none';
   const tasksCont=document.getElementById('tasksPersist');
-  if(tasksCont) tasksCont.style.display=v==='tasks'?'':'none';
-  app.style.display=v==='tasks'?'none':'';
+  if(tasksCont) tasksCont.style.display='none';
 
-  // Fade-out the outgoing container
-  const outgoing=v==='tasks'?app:(tasksCont||app);
-  outgoing.classList.add('page-exit');
+  // Render new content then show correct container with fade-in
+  _transitioning=true;
+  render();
+  _transitioning=false;
+  window.scrollTo({top:0,behavior:'instant'});
 
-  setTimeout(()=>{
-    outgoing.classList.remove('page-exit');
-    _transitioning=false;
-    render();
-    window.scrollTo({top:0,behavior:'instant'});
-    // Fade-in the incoming container
-    const incoming=v==='tasks'?(tasksCont||app):app;
-    if(incoming){
-      void incoming.offsetWidth;
-      incoming.classList.add('page-enter');
-      setTimeout(()=>incoming.classList.remove('page-enter'),300);
-    }
-  },150);
+  // Show the right container and animate it in
+  const target=v==='tasks'?(tasksCont||app):app;
+  if(target){
+    target.style.display='';
+    target.classList.remove('page-enter');
+    void target.offsetWidth;
+    target.classList.add('page-enter');
+    setTimeout(()=>target.classList.remove('page-enter'),300);
+  }
 }
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById('brand').onclick=()=>setView('home');
@@ -1331,19 +1328,18 @@ function updateGlobalTree(){
 let _transitioning=false;
 function render(){
   updateGlobalTree();
-  // During setView transition, display is already managed — skip here
   if(!_transitioning){
     const tasksCont=document.getElementById('tasksPersist');
     if(tasksCont) tasksCont.style.display=view==='tasks'?'':'none';
     app.style.display=view==='tasks'?'none':'';
   }
   if(view==='tasks') return renderTasks();
-  if(view==='home')return renderHome();
-  if(view==='words')return renderWords();
-  if(view==='horen')return renderHoren();
-  if(view==='schreiben')return renderSchreiben();
-  if(view==='adjektive')return renderAdjektive();
-  if(view==='profile')return renderProfile();
+  if(view==='home') return renderHome();
+  if(view==='words') return renderWords();
+  if(view==='horen') return renderHoren();
+  if(view==='schreiben') return renderSchreiben();
+  if(view==='adjektive') return renderAdjektive();
+  if(view==='profile') return renderProfile();
   return renderVerbs();
 }
 
