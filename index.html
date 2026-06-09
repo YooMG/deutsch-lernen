@@ -1447,6 +1447,54 @@ function renderTasks(){
     }
     .tasks-embed .task-dur,
     .tasks-embed .jour1-dur { color: var(--ink-soft) !important; }
+
+    /* ── Font size scale-up for readability ── */
+    .tasks-embed { font-size: 16px !important; }
+    .tasks-embed .header-title { font-size: 32px !important; }
+    .tasks-embed .header-date { font-size: 15px !important; }
+    .tasks-embed .level-label { font-size: 13px !important; }
+    .tasks-embed .level-pill { font-size: 15px !important; padding: 7px 18px !important; }
+    .tasks-embed .level-pill .level-sub { font-size: 11px !important; }
+    .tasks-embed .card-name { font-size: 18px !important; }
+    .tasks-embed .card-sub { font-size: 13px !important; }
+    .tasks-embed .card-pct { font-size: 13px !important; padding: 4px 11px !important; }
+    .tasks-embed .task-text,
+    .tasks-embed .task-de { font-size: 15px !important; line-height: 1.6 !important; }
+    .tasks-embed .task-ar { font-size: 14px !important; line-height: 1.6 !important; }
+    .tasks-embed .task-dur { font-size: 13px !important; }
+    .tasks-embed .task-action-btn { font-size: 13px !important; padding: 5px 14px !important; }
+    .tasks-embed .task-timer-badge { font-size: 13px !important; padding: 3px 10px !important; }
+    .tasks-embed .task-gpt-btn { font-size: 13px !important; padding: 4px 12px !important; }
+    .tasks-embed .jour1-title { font-size: 18px !important; }
+    .tasks-embed .jour1-sub { font-size: 13px !important; }
+    .tasks-embed .jour1-pct { font-size: 13px !important; padding: 4px 11px !important; }
+    .tasks-embed .jour1-text,
+    .tasks-embed .jour1-text .task-de { font-size: 15px !important; line-height: 1.6 !important; }
+    .tasks-embed .jour1-text .task-ar { font-size: 14px !important; }
+    .tasks-embed .jour1-num { font-size: 12px !important; min-width: 24px !important; }
+    .tasks-embed .jour1-cat { font-size: 12px !important; padding: 3px 9px !important; }
+    .tasks-embed .jour1-dur { font-size: 13px !important; }
+    .tasks-embed .jour1-gpt-btn { font-size: 12px !important; padding: 4px 10px !important; }
+    .tasks-embed .footer-summary { font-size: 15px !important; }
+    .tasks-embed .btn-reset { font-size: 14px !important; padding: 9px 20px !important; }
+    .tasks-embed .icon-btn { width: 40px !important; height: 40px !important; font-size: 18px !important; }
+    .tasks-embed .task-check,
+    .tasks-embed .jour1-check { width: 28px !important; height: 28px !important; }
+    .tasks-embed .report-title { font-size: 17px !important; }
+    .tasks-embed .report-subtitle { font-size: 14px !important; }
+    .tasks-embed .stat-label { font-size: 12px !important; }
+    .tasks-embed .stat-value { font-size: 26px !important; }
+    .tasks-embed .stat-unit { font-size: 14px !important; }
+    .tasks-embed .rr-text { font-size: 14px !important; line-height: 1.55 !important; }
+    .tasks-embed .rr-chip { font-size: 12px !important; padding: 3px 9px !important; }
+    .tasks-embed .report-axis-name { font-size: 14px !important; }
+    .tasks-embed .report-axis-count { font-size: 13px !important; }
+
+    /* Spacing tweaks for breathing room */
+    .tasks-embed .task { padding: 10px 10px !important; gap: 12px !important; }
+    .tasks-embed .jour1-item { padding: 10px 10px !important; gap: 12px !important; }
+    .tasks-embed .task-meta-row { gap: 8px !important; margin-top: 7px !important; }
+    .tasks-embed .card-top { padding: 16px 18px 0 !important; margin-bottom: 14px !important; }
   `;
 
   let tasksCont = document.getElementById('tasksPersist');
