@@ -542,10 +542,6 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .m-err{color:var(--rust);font-size:13px;font-weight:700;margin-top:8px;min-height:16px;text-align:center}
 .fade{animation:fade .35s ease}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .stagger>*{animation:fade .4s ease backwards}
-/* ── Page transition ── */
-#app,#tasksPersist{transition:opacity .18s ease,transform .18s ease}
-#app.page-exit,#tasksPersist.page-exit{opacity:0;transform:translateY(6px);pointer-events:none}
-#app.page-enter,#tasksPersist.page-enter{animation:fade .28s ease}
 
 /* ════════ AUTH OVERLAY ════════ */
 #authOverlay{position:fixed;inset:0;background:var(--paper);z-index:9999;display:flex;align-items:stretch;transition:opacity .35s}
@@ -1277,9 +1273,7 @@ const searchBox=document.getElementById('searchBox');
 const searchInput=document.getElementById('search');
 
 /* ---- router ---- */
-let _transitioning=false;
 function setView(v){
-  if(v===view) return;
   view=v; W.query=''; V.query=''; searchInput.value='';
   if(v!=='words') W.onlyUnknown=false;
   if(v!=='verbs') V.onlyUnknown=false;
@@ -1287,27 +1281,8 @@ function setView(v){
   searchBox.classList.toggle('hidden',v==='home'||v==='tasks');
   if(v==='words'||v==='verbs') searchInput.placeholder=v==='words'?'ابحث بالعربية أو الألمانية…':'ابحث عن فعل أو معنى…';
   fcReset(); qz=null;
-
-  // Hide BOTH containers immediately — no flash possible
-  app.style.display='none';
-  const tasksCont=document.getElementById('tasksPersist');
-  if(tasksCont) tasksCont.style.display='none';
-
-  // Render new content then show correct container with fade-in
-  _transitioning=true;
   render();
-  _transitioning=false;
   window.scrollTo({top:0,behavior:'instant'});
-
-  // Show the right container and animate it in
-  const target=v==='tasks'?(tasksCont||app):app;
-  if(target){
-    target.style.display='';
-    target.classList.remove('page-enter');
-    void target.offsetWidth;
-    target.classList.add('page-enter');
-    setTimeout(()=>target.classList.remove('page-enter'),300);
-  }
 }
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById('brand').onclick=()=>setView('home');
@@ -1325,14 +1300,11 @@ function updateGlobalTree(){
   if(el)el.innerHTML=buildTreeSVG(tp,wp,vp);
 }
 
-let _transitioning=false;
 function render(){
   updateGlobalTree();
-  if(!_transitioning){
-    const tasksCont=document.getElementById('tasksPersist');
-    if(tasksCont) tasksCont.style.display=view==='tasks'?'':'none';
-    app.style.display=view==='tasks'?'none':'';
-  }
+  const tasksCont=document.getElementById('tasksPersist');
+  if(tasksCont) tasksCont.style.display=view==='tasks'?'':'none';
+  app.style.display=view==='tasks'?'none':'';
   if(view==='tasks') return renderTasks();
   if(view==='home') return renderHome();
   if(view==='words') return renderWords();
