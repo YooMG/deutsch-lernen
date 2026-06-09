@@ -1316,7 +1316,6 @@ function render(){
 }
 
 /* daily tasks embedded app */
-window._appRender = null; // will be set after main render() is defined
 
 // On each page load, reset any "running" tasks to idle (they can't resume across sessions)
 (function(){
@@ -1462,39 +1461,50 @@ function renderTasks(){
     ${bodyContent}
   </div>`;
 
-  // Run embedded scripts by injecting into DOM (gives proper window scope)
-  // Only inject once — subsequent visits reuse the already-injected functions
+  // Run embedded scripts by injecting into DOM, but wrapped in IIFE to isolate scope.
+  // Without IIFE the tasks script redefines window.render and breaks the app router.
   if(!window._tasksScriptsInjected){
     window._tasksScriptsInjected = true;
-    // Save app render BEFORE injecting tasks script (which redefines render)
-    const _savedAppRender = window.render;
     const scripts = TASKS_HTML.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
     scripts.forEach(scriptTag => {
-      const code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
+      let code = scriptTag.replace(/<script[^>]*>/i,'').replace(/<\/script>/i,'');
+      // Wrap in IIFE that explicitly exposes only what we need to window.
+      // Inside the IIFE, `render` refers to local function — but onclick="toggle(...)"
+      // in HTML still needs window.toggle, so we explicitly attach them.
+      const wrapped = `(function(){
+        ${code}
+        // Expose handlers needed by inline onclick attributes
+        window.__tasks_toggle = toggle;
+        window.__tasks_finishTask = finishTask;
+        window.__tasks_setLevel = setLevel;
+        window.__tasks_toggleReport = toggleReport;
+        window.__tasks_exportReport = exportReport;
+        window.__tasks_resetAll = resetAll;
+        window.__tasks_downloadState = downloadState;
+        window.__tasks_render = render;
+      })();`;
       try {
         const s = document.createElement('script');
-        s.textContent = code;
+        s.textContent = wrapped;
         document.head.appendChild(s);
       } catch(e) { console.warn('Task script:', e); }
     });
-    // The tasks script overwrote window.render — capture it then restore the app one
-    window._tasksRender = window.render;
-    window.render = _savedAppRender;
+    // Create wrapper globals so onclick="toggle(...)" still works
+    window.toggle        = function(...a){ return window.__tasks_toggle      &&  window.__tasks_toggle(...a); };
+    window.finishTask    = function(...a){ return window.__tasks_finishTask  &&  window.__tasks_finishTask(...a); };
+    window.setLevel      = function(...a){ return window.__tasks_setLevel    &&  window.__tasks_setLevel(...a); };
+    window.toggleReport  = function(...a){ return window.__tasks_toggleReport&&  window.__tasks_toggleReport(...a); };
+    window.exportReport  = function(...a){ return window.__tasks_exportReport&&  window.__tasks_exportReport(...a); };
+    window.resetAll      = function(...a){ return window.__tasks_resetAll    &&  window.__tasks_resetAll(...a); };
+    window.downloadState = function(...a){ return window.__tasks_downloadState&& window.__tasks_downloadState(...a); };
   } else {
-    // Subsequent visit: re-draw grid and jour1 with fresh state
-    if(typeof window._tasksRender === 'function'){
-      try{ window._tasksRender(); }catch(e){}
+    // Subsequent visit: just re-render with current state
+    if(typeof window.__tasks_render === 'function'){
+      try{ window.__tasks_render(); }catch(e){ console.warn('tasks render:', e); }
     }
   }
 
   window._tasksInitialized = true;
-  // Hook into resetAll to allow re-initialization if needed
-  const _origReset = window.resetAll;
-  if(_origReset){
-    window.resetAll = function(){
-      _origReset();
-    };
-  }
 }
 
 
@@ -4287,7 +4297,7 @@ function changeLevelTo(lvl, el){
 }
 
 /* init */
-applyTheme();window._appRender=render;window.render=render;render();checkOnboarding();
+applyTheme();render();checkOnboarding();
 </script>
 <script>
 // ═══ AUTH GALAXY ANIMATION ═══
