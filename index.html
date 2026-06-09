@@ -3264,17 +3264,23 @@ function ttsBuildCard(item,i){
   const niv=item.niveau||'A2';
   const sentences=ttsSplitSentences(item.text);
   const dotHtml=sentences.map((_,si)=>`<div class="tts-sent-dot" id="tts-dot-${i}-${si}"></div>`).join('');
+  // Source type: file (uploaded), url (link), or tts (legacy/text-only)
+  const srcType = item.audioType==='file' ? 'file' : item.audioType==='url' ? 'url' : 'tts';
+  const srcLabel = srcType==='file' ? '🎵 صوت · ملف' : srcType==='url' ? '🔗 صوت · رابط' : '🔊 نص · TTS';
+  const artIcon = srcType==='file' ? '🎵' : srcType==='url' ? '🔗' : '📖';
+  const hasExternalAudio = srcType!=='tts';
+
   const card=document.createElement('div');
   card.className='tts-card';card.id='tts-card-'+i;
   card.innerHTML=`
     <div class="tts-card-top" onclick="ttsOpenCard(${i})">
-      <div class="tts-art">📖<div class="tts-art-overlay"><span class="tts-art-btn" id="tts-art-btn-${i}">▶</span></div></div>
+      <div class="tts-art">${artIcon}<div class="tts-art-overlay"><span class="tts-art-btn" id="tts-art-btn-${i}">▶</span></div></div>
       <div class="tts-card-right">
         <div class="tts-meta-row">
           <div class="tts-info">
-            <div class="tts-label">نص · TTS <span class="niv-badge ${niv}">${niv}</span></div>
+            <div class="tts-label">${srcLabel} <span class="niv-badge ${niv}">${niv}</span></div>
             <div class="tts-title" title="${escHtml(item.title)}">${escHtml(item.title)}</div>
-            <div class="tts-badges"><span class="sc-type-badge">🔊 ${sentences.length} جملة</span></div>
+            <div class="tts-badges"><span class="sc-type-badge">📝 ${sentences.length} جملة</span></div>
           </div>
           ${isAdmin?`<button class="tts-del-btn" onclick="event.stopPropagation();ttsDelete(${i})" title="حذف">🗑</button>`:''}
         </div>
@@ -3297,7 +3303,10 @@ function ttsBuildCard(item,i){
         </div>
         <div class="tts-sent-counter">
           <span>الجملة <span id="tts-sent-num-${i}">1</span> / ${sentences.length}</span>
-          <select class="tts-voice-sel" id="ttsVoiceSel-${i}" onchange="ttsSetVoice(${i},this.value)"><option>تحميل…</option></select>
+          ${hasExternalAudio
+            ? `<span style="font-size:11px;color:var(--ink-soft)">${srcType==='file'?'ملف مرفوع':'رابط خارجي'}</span>`
+            : `<select class="tts-voice-sel" id="ttsVoiceSel-${i}" onchange="ttsSetVoice(${i},this.value)"><option>تحميل…</option></select>`
+          }
         </div>
         <div class="tts-controls">
           <button class="tts-play-btn" id="tts-btn-${i}" onclick="ttsSentToggle(${i})">▶</button>
@@ -3332,7 +3341,9 @@ function ttsBuildCard(item,i){
         ${sentences.map((s,si)=>`<p id="tts-ts-${i}-${si}" style="padding:3px 6px;border-radius:6px;margin-bottom:4px;cursor:pointer;direction:ltr" onclick="ttsJumpTo(${i},${si})">${escHtml(s)}</p>`).join('')}
       </div>
     </div>`;
-  requestAnimationFrame(()=>{const sel=document.getElementById('ttsVoiceSel-'+i);if(sel)ttsPopulateVoiceSel(sel,i);});
+  if(!hasExternalAudio){
+    requestAnimationFrame(()=>{const sel=document.getElementById('ttsVoiceSel-'+i);if(sel)ttsPopulateVoiceSel(sel,i);});
+  }
   return card;
 }
 
@@ -3379,11 +3390,70 @@ function ttsRenderDictationState(i){
 }
 
 /* ── Play sentence ── */
+/* ── Get/create audio element for an item with file/url source ── */
+function ttsGetAudioEl(i){
+  let el=document.getElementById('tts-audio-'+i);
+  if(!el){
+    const item=ttsItems[i];if(!item||!item.audioUrl)return null;
+    el=document.createElement('audio');
+    el.id='tts-audio-'+i;
+    el.src=item.audioUrl;
+    el.preload='metadata';
+    el.style.display='none';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 function ttsPlaySentence(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
   const sentences=ttsSplitSentences(item.text);const si=st.sentIdx;if(si>=sentences.length)return;
   const text=sentences[si];
-  window.speechSynthesis.cancel();if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
+
+  // Cancel any TTS playback first
+  window.speechSynthesis.cancel();
+  if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
+
+  // ── If item has external audio (file/url): play the FULL audio (not per-sentence) ──
+  if(item.audioUrl){
+    const audio=ttsGetAudioEl(i);
+    if(!audio){return;}
+    // Stop any other audio
+    document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>{if(a!==audio){a.pause();a.currentTime=0;}});
+    audio.playbackRate=Math.max(0.5,Math.min(2,ttsRate));
+    audio.volume=Math.max(0,Math.min(1,ttsVolume));
+    audio.muted=ttsMuted;
+
+    ttsIsPaused=false;st.paused=false;
+
+    audio.onloadedmetadata=()=>{
+      ttsDuration=audio.duration||0;
+      const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
+    };
+    audio.ontimeupdate=()=>{
+      ttsElapsed=audio.currentTime;
+      ttsUpdateProgress(i,audio.currentTime,audio.duration||0);
+    };
+    audio.onended=()=>{
+      ttsIsPaused=false;ttsUpdateButtons(i,'▶',false);
+      ttsUpdateProgress(i,audio.duration,audio.duration);
+      ttsShowPostPlay(i);
+    };
+    audio.onerror=()=>{
+      console.warn('Audio load error');
+      ttsUpdateButtons(i,'▶',false);
+    };
+
+    audio.play().then(()=>{
+      ttsUpdateButtons(i,'⏸',true);
+    }).catch(e=>{
+      console.warn('Audio play blocked:',e);
+      ttsUpdateButtons(i,'▶',false);
+    });
+    return;
+  }
+
+  // ── Legacy TTS path (no audioUrl) ──
   const voices=ttsGetGermanVoices();
   const sel=document.getElementById('ttsVoiceSel-'+i);
   const vIdx=sel?parseInt(sel.dataset.vidx||sel.value||'0'):0;
@@ -3418,6 +3488,15 @@ function ttsShowPostPlay(i){
 function ttsSentReplay(i){
   if(ttsCurrent!==i)return;
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
+
+  // If external audio, just rewind and play
+  if(item.audioUrl){
+    const audio=ttsGetAudioEl(i);
+    if(audio){audio.currentTime=0;ttsPlaySentence(i);}
+    return;
+  }
+
+  // Legacy TTS replay
   const sentences=ttsSplitSentences(item.text);const text=sentences[st.sentIdx]||'';
   window.speechSynthesis.cancel();if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
   const voices=ttsGetGermanVoices();const sel=document.getElementById('ttsVoiceSel-'+i);
@@ -3434,9 +3513,48 @@ function ttsSentReplay(i){
 
 /* ── Toggle play/pause ── */
 function ttsSentToggle(i){if(ttsCurrent!==i){ttsOpenCard(i);return;}if(ttsIsPaused)ttsResume(i);else ttsPause(i);}
-function ttsPause(i){ttsPausedAt=(performance.now()-ttsStartTime);ttsElapsed=ttsPausedAt/1000;window.speechSynthesis.cancel();if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}if(ttsKeepAliveTimer){clearInterval(ttsKeepAliveTimer);ttsKeepAliveTimer=null;}ttsIsPaused=true;const st=ttsGetState(i);st.paused=true;ttsUpdateButtons(i,'▶',false);ttsUpdateProgress(i,ttsElapsed,ttsDuration);}
-function ttsResume(i){if(!ttsIsPaused)return;ttsIsPaused=false;const st=ttsGetState(i);st.paused=false;ttsPausedAt=0;ttsPlaySentence(i);}
-function ttsStopCurrent(){window.speechSynthesis.cancel();if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}if(ttsKeepAliveTimer){clearInterval(ttsKeepAliveTimer);ttsKeepAliveTimer=null;}if(ttsCurrent>=0){const op=document.getElementById('tts-player-'+ttsCurrent);if(op)op.style.display='none';const oc=document.getElementById('tts-card-'+ttsCurrent);if(oc)oc.classList.remove('tts-playing');ttsUpdateButtons(ttsCurrent,'▶',false);}ttsCurrent=-1;ttsPausedAt=0;ttsIsPaused=false;ttsElapsed=0;}
+
+function ttsPause(i){
+  const item=ttsItems[i];
+  if(item&&item.audioUrl){
+    const audio=ttsGetAudioEl(i);
+    if(audio){audio.pause();ttsIsPaused=true;const st=ttsGetState(i);st.paused=true;ttsUpdateButtons(i,'▶',false);}
+    return;
+  }
+  // Legacy TTS pause
+  ttsPausedAt=(performance.now()-ttsStartTime);ttsElapsed=ttsPausedAt/1000;
+  window.speechSynthesis.cancel();
+  if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
+  if(ttsKeepAliveTimer){clearInterval(ttsKeepAliveTimer);ttsKeepAliveTimer=null;}
+  ttsIsPaused=true;const st=ttsGetState(i);st.paused=true;
+  ttsUpdateButtons(i,'▶',false);ttsUpdateProgress(i,ttsElapsed,ttsDuration);
+}
+
+function ttsResume(i){
+  if(!ttsIsPaused)return;
+  const item=ttsItems[i];
+  if(item&&item.audioUrl){
+    const audio=ttsGetAudioEl(i);
+    if(audio){audio.play().catch(()=>{});ttsIsPaused=false;const st=ttsGetState(i);st.paused=false;ttsUpdateButtons(i,'⏸',true);}
+    return;
+  }
+  ttsIsPaused=false;const st=ttsGetState(i);st.paused=false;ttsPausedAt=0;
+  ttsPlaySentence(i);
+}
+
+function ttsStopCurrent(){
+  window.speechSynthesis.cancel();
+  // Stop all audio elements too
+  document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>{a.pause();a.currentTime=0;});
+  if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
+  if(ttsKeepAliveTimer){clearInterval(ttsKeepAliveTimer);ttsKeepAliveTimer=null;}
+  if(ttsCurrent>=0){
+    const op=document.getElementById('tts-player-'+ttsCurrent);if(op)op.style.display='none';
+    const oc=document.getElementById('tts-card-'+ttsCurrent);if(oc)oc.classList.remove('tts-playing');
+    ttsUpdateButtons(ttsCurrent,'▶',false);
+  }
+  ttsCurrent=-1;ttsPausedAt=0;ttsIsPaused=false;ttsElapsed=0;
+}
 
 /* ── Next sentence ── */
 function ttsSentNext(i){
@@ -3466,13 +3584,93 @@ function ttsRestart(i){
   ttsRenderDictationState(i);ttsPlaySentence(i);
 }
 
-/* ── Check answer ── */
-function ttsNormalize(s){return String(s).trim().toLowerCase().replace(/[.,!?;:\-–—]/g,'').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/\s+/g,' ');}
+/* ════════ Evaluation system (per-sentence dictation) ════════
+   Rules (from spec):
+   1. Split original_transcript into ordered sentences ✓ (ttsSplitSentences)
+   2. Match user input to the sentence index provided ✓
+   3. Evaluate only that sentence, not the full text ✓
+   4. Ignore capitalization differences ✓ (toLowerCase)
+   5. Ignore minor punctuation differences ✓ (strip .,!?;:- etc.)
+   6. Treat German characters (ä, ö, ü, ß) as strictly significant ✓ (NO conversion to ae/oe/ue/ss)
+   7. Provide per-sentence correction immediately ✓
+   8. Keep independent evaluation per sentence ✓
+   9. Store consistency across sentences (st.scores aggregation) ✓
+*/
+function ttsNormalize(s){
+  // Strict normalization: lowercase + strip punctuation + collapse whitespace.
+  // German chars ä ö ü ß are PRESERVED (strictly significant per rule #6).
+  return String(s)
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:\-–—„""''«»()\[\]"']/g,'')
+    .replace(/\s+/g,' ');
+}
+function ttsNormalizeWord(w){
+  return String(w).trim().toLowerCase().replace(/[.,!?;:\-–—„""''«»()\[\]"']/g,'');
+}
+
+/* Per-sentence evaluation matching the JSON spec.
+   Returns: { sentence_index, expected_sentence, user_sentence, score,
+              correct_words, wrong_words, missing_words, extra_words, corrected_sentence } */
+function ttsEvaluate(sentenceIndex, expected, userText){
+  const expectedNorm = ttsNormalize(expected);
+  const userNorm = ttsNormalize(userText);
+  const expectedWords = expected.trim().split(/\s+/).filter(Boolean);
+  const userWords = userText.trim().split(/\s+/).filter(Boolean);
+
+  const correct_words = [], wrong_words = [], missing_words = [], extra_words = [];
+
+  // Word-by-word positional comparison
+  const len = Math.max(expectedWords.length, userWords.length);
+  for(let k=0; k<len; k++){
+    const cw = expectedWords[k];
+    const uw = userWords[k];
+    if(cw && uw){
+      if(ttsNormalizeWord(cw) === ttsNormalizeWord(uw)) correct_words.push(cw);
+      else { wrong_words.push(uw); missing_words.push(cw); }
+    } else if(cw && !uw){
+      missing_words.push(cw);
+    } else if(uw && !cw){
+      extra_words.push(uw);
+    }
+  }
+
+  // Score: percent of correct words vs expected length (0-100)
+  const score = expectedWords.length === 0 ? 0
+              : Math.round((correct_words.length / expectedWords.length) * 100);
+
+  // Pass requires full sentence match (normalized)
+  const passed = expectedNorm === userNorm;
+
+  return {
+    sentence_index: sentenceIndex,
+    expected_sentence: expected,
+    user_sentence: userText,
+    score,
+    passed,
+    correct_words,
+    wrong_words,
+    missing_words,
+    extra_words,
+    corrected_sentence: expected
+  };
+}
+
 function ttsCheckAnswer(i){
   const st=ttsGetState(i);if(st.checked)return;st.checked=true;
-  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');const correct=sentences[st.sentIdx]||'';
-  const inp=document.getElementById('tts-input-'+i);const userVal=(inp?.value||'').trim();
-  const ok=ttsNormalize(userVal)===ttsNormalize(correct);st.scores[st.sentIdx]=ok;
+  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');
+  const correct=sentences[st.sentIdx]||'';
+  const inp=document.getElementById('tts-input-'+i);
+  const userVal=(inp?.value||'').trim();
+
+  // Run evaluation
+  const evalResult = ttsEvaluate(st.sentIdx + 1, correct, userVal);
+  const ok = evalResult.passed;
+  st.scores[st.sentIdx] = ok;
+  // Store full evaluation for aggregation / final report
+  st.evaluations = st.evaluations || [];
+  st.evaluations[st.sentIdx] = evalResult;
+
   const area=document.getElementById('tts-input-area-'+i);
   const fb=document.getElementById('tts-feedback-'+i);
   const checkBtn=document.getElementById('tts-check-btn-'+i);
@@ -3483,23 +3681,28 @@ function ttsCheckAnswer(i){
 
   // stop audio when user submits
   window.speechSynthesis.cancel();
+  document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>a.pause());
   if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
   ttsUpdateButtons(i,'▶',false);
 
   if(inp)inp.disabled=true;
   if(checkBtn)checkBtn.style.display='none';
   if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='inline-block';   // ← always show immediately
+  if(nextBtn)nextBtn.style.display='inline-block';
   if(kbHint)kbHint.textContent='Shift+Enter = التالية';
 
   if(ok){
     if(area)area.className='tts-input-area tts-correct';
-    if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML='✅ Richtig! أحسنت!';}
+    if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML=`✅ Richtig! أحسنت! <span style="opacity:.7;font-size:11px">(${evalResult.score}%)</span>`;}
     if(hintReqBtn)hintReqBtn.style.display='none';
     const hintArea=document.getElementById('tts-hint-'+i);if(hintArea)hintArea.classList.remove('visible');
   } else {
     if(area)area.className='tts-input-area tts-wrong';
-    if(fb){fb.className='tts-feedback tts-fb-wrong';fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct);}
+    if(fb){
+      fb.className='tts-feedback tts-fb-wrong';
+      fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct)+
+        `<div style="margin-top:6px;font-size:11px;opacity:.75">النتيجة: ${evalResult.score}% · صحيح: ${evalResult.correct_words.length} · خطأ: ${evalResult.wrong_words.length} · مفقود: ${evalResult.missing_words.length}${evalResult.extra_words.length?' · زائد: '+evalResult.extra_words.length:''}</div>`;
+    }
     if(inp)inp.value=correct;
     if(hintReqBtn)hintReqBtn.style.display='';
     if(userVal===''){
@@ -3508,7 +3711,8 @@ function ttsCheckAnswer(i){
       ttsShowHint(i,correct,1);
     }
   }
-  const dot=document.getElementById('tts-dot-'+i+'-'+st.sentIdx);if(dot)dot.className='tts-sent-dot '+(ok?'done-ok':'done-wrong');
+  const dot=document.getElementById('tts-dot-'+i+'-'+st.sentIdx);
+  if(dot)dot.className='tts-sent-dot '+(ok?'done-ok':'done-wrong');
 }
 function ttsDiffHTML(user,correct){
   const uW=user.trim().split(/\s+/);const cW=correct.trim().split(/\s+/);let out='';const len=Math.max(uW.length,cW.length);
@@ -3662,29 +3866,109 @@ function ttsDelete(i){const item=ttsItems[i];if(!item)return;if(!confirm('حذف
 function ttsOpenAddModal(){
   const nivOpts=['A1','A2','B1','B2','C1'].map(n=>`<option value="${n}">${n}</option>`).join('');
   const ov=document.createElement('div');ov.className='modal-ov';
-  ov.innerHTML=`<div class="modal" style="max-width:520px">
-    <h3>📖 إضافة نص جديد</h3>
-    <div class="m-sub">أضف نصاً ألمانياً — سيُحوَّل لصوت ويظهر لجميع المستخدمين جملة جملة</div>
-    <div class="fld" style="margin-top:12px"><label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">عنوان النص</label>
-      <input id="ttsAddTitle" type="text" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;direction:ltr" placeholder="z.B. Im Restaurant" autocomplete="off"></div>
-    <div class="fld" style="margin-top:10px"><label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">المستوى</label>
-      <select id="ttsAddNiveau" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;cursor:pointer">${nivOpts}</select></div>
-    <div class="fld" style="margin-top:10px"><label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">النص الألماني (جملة لكل سطر)</label>
-      <textarea class="tts-modal-textarea" id="ttsAddText" placeholder="Guten Morgen!&#10;Wie geht es Ihnen?&#10;Ich heiße Klaus."></textarea></div>
+  ov.innerHTML=`<div class="modal" style="max-width:560px">
+    <h3>🎧 إضافة درس استماع جديد</h3>
+    <div class="m-sub">ارفع ملفًا صوتيًا أو ضع رابطًا، مع نصه الكامل — سيُعرض للمستخدمين جملة جملة</div>
+
+    <div class="fld" style="margin-top:14px">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">عنوان الدرس</label>
+      <input id="ttsAddTitle" type="text" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;direction:ltr" placeholder="z.B. Im Restaurant" autocomplete="off">
+    </div>
+
+    <div class="fld" style="margin-top:10px">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">المستوى</label>
+      <select id="ttsAddNiveau" style="padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;cursor:pointer">${nivOpts}</select>
+    </div>
+
+    <div class="fld" style="margin-top:14px">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">مصدر الصوت</label>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button type="button" id="ttsSrcTab-file" class="tts-src-tab active" onclick="ttsSwitchSrc('file')" style="flex:1;padding:8px;border:1.5px solid var(--teal);border-radius:8px;background:var(--teal);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">📁 رفع ملف</button>
+        <button type="button" id="ttsSrcTab-url" class="tts-src-tab" onclick="ttsSwitchSrc('url')" style="flex:1;padding:8px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">🔗 رابط من النت</button>
+      </div>
+
+      <div id="ttsSrcPanel-file">
+        <input id="ttsAddFile" type="file" accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/*" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:13px;color:var(--ink);outline:none">
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">يُفضّل ملفات أقل من 4MB. الصيغ المدعومة: mp3, wav, ogg</div>
+      </div>
+
+      <div id="ttsSrcPanel-url" style="display:none">
+        <input id="ttsAddUrl" type="url" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;direction:ltr" placeholder="https://example.com/audio.mp3">
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">رابط مباشر لملف صوتي (mp3, wav, ogg)</div>
+      </div>
+    </div>
+
+    <div class="fld" style="margin-top:10px">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">النص المرجعي الكامل (جملة لكل سطر)</label>
+      <textarea class="tts-modal-textarea" id="ttsAddText" placeholder="Guten Morgen!&#10;Wie geht es Ihnen?&#10;Ich heiße Klaus."></textarea>
+    </div>
+
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="ttsConfirmAdd()" style="flex:1;padding:11px;background:var(--teal);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">💾 حفظ النص</button>
+      <button onclick="ttsConfirmAdd()" style="flex:1;padding:11px;background:var(--teal);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">💾 حفظ الدرس</button>
       <button onclick="closeModal()" style="padding:11px 18px;background:var(--paper-2);color:var(--ink-soft);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">إلغاء</button>
-    </div></div>`;
+    </div>
+  </div>`;
   document.body.appendChild(ov);ov.addEventListener('click',e=>{if(e.target===ov)closeModal();});
   setTimeout(()=>document.getElementById('ttsAddTitle')?.focus(),100);
 }
-function ttsConfirmAdd(){
+
+function ttsSwitchSrc(which){
+  const fileTab=document.getElementById('ttsSrcTab-file');
+  const urlTab=document.getElementById('ttsSrcTab-url');
+  const filePanel=document.getElementById('ttsSrcPanel-file');
+  const urlPanel=document.getElementById('ttsSrcPanel-url');
+  if(which==='file'){
+    fileTab.classList.add('active');urlTab.classList.remove('active');
+    fileTab.style.cssText='flex:1;padding:8px;border:1.5px solid var(--teal);border-radius:8px;background:var(--teal);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer';
+    urlTab.style.cssText='flex:1;padding:8px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer';
+    filePanel.style.display='';urlPanel.style.display='none';
+  } else {
+    urlTab.classList.add('active');fileTab.classList.remove('active');
+    urlTab.style.cssText='flex:1;padding:8px;border:1.5px solid var(--teal);border-radius:8px;background:var(--teal);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer';
+    fileTab.style.cssText='flex:1;padding:8px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer';
+    urlPanel.style.display='';filePanel.style.display='none';
+  }
+}
+
+async function ttsConfirmAdd(){
   const title=(document.getElementById('ttsAddTitle')?.value||'').trim();
   const text=(document.getElementById('ttsAddText')?.value||'').trim();
   const niveau=document.getElementById('ttsAddNiveau')?.value||'A2';
-  if(!title){alert('أضف عنواناً');return;}if(!text){alert('أضف النص');return;}
-  const item={id:'tts-'+Date.now(),title,text,niveau,createdAt:Date.now()};
-  ttsItems.push(item);ttsSaveLocal();if(window._ttsFireSave)window._ttsFireSave(item);
+  const isFileTab=document.getElementById('ttsSrcTab-file')?.classList.contains('active');
+  const fileInput=document.getElementById('ttsAddFile');
+  const urlInput=document.getElementById('ttsAddUrl');
+
+  if(!title){alert('أضف عنواناً');return;}
+  if(!text){alert('أضف النص المرجعي');return;}
+
+  let audioUrl='', audioType='', audioData='';
+  if(isFileTab){
+    const file=fileInput?.files?.[0];
+    if(!file){alert('اختر ملفًا صوتيًا');return;}
+    if(file.size>5*1024*1024){
+      if(!confirm('الملف كبير ('+Math.round(file.size/1024/1024)+'MB). قد يتعذر حفظه. متابعة؟'))return;
+    }
+    // Convert to base64 data URL for storage
+    audioData=await new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(r.result);
+      r.onerror=()=>rej(new Error('Read failed'));
+      r.readAsDataURL(file);
+    }).catch(e=>{alert('تعذر قراءة الملف');return null;});
+    if(!audioData)return;
+    audioUrl=audioData;
+    audioType='file';
+  } else {
+    const url=(urlInput?.value||'').trim();
+    if(!url){alert('أضف رابطًا للملف الصوتي');return;}
+    if(!/^https?:\/\//.test(url)){alert('الرابط يجب أن يبدأ بـ http:// أو https://');return;}
+    audioUrl=url;
+    audioType='url';
+  }
+
+  const item={id:'tts-'+Date.now(),title,text,niveau,audioUrl,audioType,createdAt:Date.now()};
+  ttsItems.push(item);ttsSaveLocal();
+  if(window._ttsFireSave)try{window._ttsFireSave(item);}catch(e){console.warn(e);}
   closeModal();ttsRenderCards();
 }
 
