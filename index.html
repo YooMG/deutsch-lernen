@@ -724,12 +724,13 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-del-btn{background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:5px;border-radius:8px;transition:.15s;font-size:15px;flex:none;align-self:flex-start}
 .tts-del-btn:hover{color:#c0392b;background:rgba(192,57,43,.1)}
 .tts-player{padding:8px 14px 14px;border-top:1px solid var(--line)}
-.tts-waveform{height:64px;background:#1a1a1a;border-radius:10px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:2px;overflow:hidden;padding:8px 12px;position:relative;cursor:pointer}
-.tts-bar{width:3px;border-radius:2px;background:#555;transition:background .15s;flex:none}
-.tts-waveform.tts-wf-active .tts-bar{animation:ttsBarPulse 1.2s ease-in-out infinite}
-.tts-waveform.tts-wf-active .tts-bar:nth-child(2n){animation-delay:.15s}
-.tts-waveform.tts-wf-active .tts-bar:nth-child(3n){animation-delay:.3s}
-.tts-waveform.tts-wf-active .tts-bar:nth-child(4n){animation-delay:.45s}
+.tts-waveform{height:64px;background:var(--paper-2);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden;padding:8px 12px;position:relative;cursor:pointer;border:1px solid var(--line)}
+.tts-bar{width:3px;border-radius:2px;background:color-mix(in srgb,var(--ink-soft) 30%,transparent);transition:background .12s;flex:none}
+.tts-bar.played{background:var(--teal)}
+.tts-waveform.tts-wf-active .tts-bar.played{animation:ttsBarPulse 1.2s ease-in-out infinite}
+.tts-waveform.tts-wf-active .tts-bar.played:nth-child(2n){animation-delay:.15s}
+.tts-waveform.tts-wf-active .tts-bar.played:nth-child(3n){animation-delay:.3s}
+.tts-waveform.tts-wf-active .tts-bar.played:nth-child(4n){animation-delay:.45s}
 @keyframes ttsBarPulse{0%,100%{background:#4ba3b3;transform:scaleY(.4)}50%{background:#2f7d8a;transform:scaleY(1)}}
 .tts-progress-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:#333}
 .tts-progress-fill{height:100%;background:var(--teal);width:0%;transition:width .3s linear}
@@ -3233,7 +3234,97 @@ function ttsEstimateDuration(text,rate){const w=text.trim().split(/\s+/).length,
 function ttsFormatTime(s){if(!s||isNaN(s))return'0:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ttsGetState(i){if(!ttsCardState[i])ttsCardState[i]={sentIdx:0,scores:[],checked:false,paused:false};return ttsCardState[i];}
-function ttsGenBars(){let b='';for(let i=0;i<60;i++){const h=Math.max(14,Math.floor(Math.random()*44));b+=`<div class="tts-bar" style="height:${h}px"></div>`;}return b;}
+function ttsGenBars(itemId, audioUrl){
+  // Default bars (placeholder while audio loads, or for TTS items)
+  const BAR_COUNT = 90;
+  let b='';
+  for(let i=0;i<BAR_COUNT;i++){
+    const h=Math.max(6,Math.floor(Math.random()*44));
+    b+=`<div class="tts-bar" style="height:${h}px"></div>`;
+  }
+  return b;
+}
+
+/* ── Click on waveform to seek to that position (external audio only) ── */
+function ttsSeekFromWaveform(ev, i){
+  const item = ttsItems[i];
+  if(!item || !item.audioUrl) return;
+  const audio = ttsGetAudioEl(i);
+  if(!audio || !audio.duration) return;
+  const wf = ev.currentTarget;
+  const rect = wf.getBoundingClientRect();
+  const x = ev.clientX - rect.left;
+  const pct = Math.max(0, Math.min(1, x / rect.width));
+  audio.currentTime = pct * audio.duration;
+  ttsUpdateProgress(i, audio.currentTime, audio.duration);
+}
+
+/* ── Analyze real audio file and render true waveform ── */
+const _ttsWaveformCache = {};
+async function ttsRenderRealWaveform(i){
+  const item = ttsItems[i];
+  if(!item || !item.audioUrl) return;
+  const wf = document.getElementById('tts-wf-'+i);
+  if(!wf) return;
+
+  // Use cache if we've already analyzed this audio
+  let peaks = _ttsWaveformCache[item.id];
+  if(!peaks){
+    try{
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if(!AudioCtx) return; // browser doesn't support, keep random bars
+      const ctx = new AudioCtx();
+
+      // Fetch and decode audio
+      let arrayBuffer;
+      if(item.audioUrl.startsWith('data:')){
+        // base64 data URL
+        const base64 = item.audioUrl.split(',')[1] || '';
+        const bin = atob(base64);
+        const len = bin.length;
+        const buf = new Uint8Array(len);
+        for(let k=0;k<len;k++) buf[k] = bin.charCodeAt(k);
+        arrayBuffer = buf.buffer;
+      } else {
+        const resp = await fetch(item.audioUrl, {mode:'cors'});
+        arrayBuffer = await resp.arrayBuffer();
+      }
+
+      const audioBuf = await ctx.decodeAudioData(arrayBuffer);
+      const channelData = audioBuf.getChannelData(0); // mono / first channel
+      const BAR_COUNT = 90;
+      const blockSize = Math.floor(channelData.length / BAR_COUNT);
+      peaks = [];
+      let maxPeak = 0;
+      for(let k=0; k<BAR_COUNT; k++){
+        let sum = 0;
+        const start = k * blockSize;
+        for(let j=0; j<blockSize; j++){
+          sum += Math.abs(channelData[start+j] || 0);
+        }
+        const avg = sum / blockSize;
+        peaks.push(avg);
+        if(avg > maxPeak) maxPeak = avg;
+      }
+      // Normalize 0..1
+      if(maxPeak > 0) peaks = peaks.map(p => p/maxPeak);
+      _ttsWaveformCache[item.id] = peaks;
+      try{ ctx.close(); }catch(e){}
+    } catch(e){
+      console.warn('Waveform analysis failed:', e);
+      return; // keep placeholder random bars
+    }
+  }
+
+  // Render peaks into bars
+  const bars = wf.querySelectorAll('.tts-bar');
+  peaks.forEach((p, k) => {
+    if(bars[k]){
+      const h = Math.max(4, Math.round(p * 48));
+      bars[k].style.height = h + 'px';
+    }
+  });
+}
 
 /* ── Render section ── */
 function ttsRenderSection(container){
@@ -3293,7 +3384,7 @@ function ttsBuildCard(item,i){
       </div>
       <div id="tts-dictation-${i}">
         <div class="tts-sent-dots">${dotHtml}</div>
-        <div class="tts-waveform" id="tts-wf-${i}">
+        <div class="tts-waveform" id="tts-wf-${i}" ${hasExternalAudio?`onclick="ttsSeekFromWaveform(event,${i})"`:''}>
           ${ttsGenBars()}
           <div class="tts-progress-wrap"><div class="tts-progress-fill" id="tts-prog-${i}"></div></div>
         </div>
@@ -3364,6 +3455,11 @@ function ttsOpenCard(i){
   const card=document.getElementById('tts-card-'+i);if(card)card.classList.add('tts-playing');
   ttsCardState[i]={sentIdx:0,scores:[],checked:false,paused:false};
   ttsRenderDictationState(i);
+  // For external audio (file/url): render the real waveform from the audio data
+  const item=ttsItems[i];
+  if(item&&item.audioUrl){
+    ttsRenderRealWaveform(i);
+  }
   ttsPlaySentence(i);
 }
 
@@ -3846,7 +3942,24 @@ function ttsHandleKey(e,i){
 
 /* ── RAF loop + progress ── */
 function ttsUpdateButtons(i,icon,playing){const btn=document.getElementById('tts-btn-'+i);const artBtn=document.getElementById('tts-art-btn-'+i);const wf=document.getElementById('tts-wf-'+i);if(btn)btn.textContent=icon;if(artBtn)artBtn.textContent=icon;if(wf)wf.classList.toggle('tts-wf-active',playing);}
-function ttsUpdateProgress(i,elapsed,duration){const prog=document.getElementById('tts-prog-'+i);const ct=document.getElementById('tts-ct-'+i);const d=duration||ttsDuration||1;const pct=Math.min(100,(elapsed/d)*100);if(prog)prog.style.width=pct+'%';if(ct)ct.textContent=ttsFormatTime(elapsed);}
+function ttsUpdateProgress(i,elapsed,duration){
+  const prog=document.getElementById('tts-prog-'+i);
+  const ct=document.getElementById('tts-ct-'+i);
+  const d=duration||ttsDuration||1;
+  const pct=Math.min(100,(elapsed/d)*100);
+  if(prog)prog.style.width=pct+'%';
+  if(ct)ct.textContent=ttsFormatTime(elapsed);
+  // Color the waveform bars based on playback position
+  const wf=document.getElementById('tts-wf-'+i);
+  if(wf){
+    const bars=wf.querySelectorAll('.tts-bar');
+    const cutoff=Math.floor((pct/100)*bars.length);
+    bars.forEach((b,idx)=>{
+      if(idx<cutoff)b.classList.add('played');
+      else b.classList.remove('played');
+    });
+  }
+}
 function ttsRafLoop(i){ttsRafId=requestAnimationFrame(()=>{if(ttsIsPaused||ttsCurrent!==i)return;ttsElapsed=(performance.now()-ttsStartTime)/1000;ttsUpdateProgress(i,Math.min(ttsElapsed,ttsDuration),ttsDuration);if(ttsElapsed<ttsDuration+1)ttsRafLoop(i);});}
 
 /* ── Speed / Voice / Volume ── */
