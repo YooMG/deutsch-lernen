@@ -3233,6 +3233,16 @@ function ttsLoadLocal(){try{const d=JSON.parse(localStorage.getItem('tts_items_v
 
 /* ── Helpers ── */
 function ttsSplitSentences(text){return(text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[text]).map(s=>s.trim()).filter(Boolean);}
+
+/* Returns sentence array — uses SRT cues if available (each cue = one sentence),
+   otherwise splits text by punctuation. This is THE canonical source of sentences. */
+function ttsGetSentences(item){
+  if(!item) return [];
+  if(item.srtCues && Array.isArray(item.srtCues) && item.srtCues.length>0){
+    return item.srtCues.map(c => (c.text||'').trim()).filter(Boolean);
+  }
+  return ttsSplitSentences(item.text || '');
+}
 function ttsEstimateDuration(text,rate){const w=text.trim().split(/\s+/).length,c=text.length;return Math.max(3,Math.round(((w/120*60+c/10)/2)/rate));}
 function ttsFormatTime(s){if(!s||isNaN(s))return'0:00';const m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -3315,7 +3325,7 @@ async function ttsAnalyzeAudio(i){
     _ttsWaveformCache[item.id] = normalizedPeaks;
 
     // ── 2. Determine sentence timings — prefer SRT cues if provided ──
-    const sentences = ttsSplitSentences(item.text);
+    const sentences = ttsGetSentences(item);
     let timings;
     if(item.srtCues && Array.isArray(item.srtCues) && item.srtCues.length > 0){
       // Use exact SRT start times
@@ -3483,7 +3493,7 @@ function ttsRenderCards(){
 function ttsBuildCard(item,i){
   const isAdmin=(window._currentUser?.email===ADMIN_EMAIL);
   const niv=item.niveau||'A2';
-  const sentences=ttsSplitSentences(item.text);
+  const sentences=ttsGetSentences(item);
   const dotHtml=sentences.map((_,si)=>`<div class="tts-sent-dot" id="tts-dot-${i}-${si}"></div>`).join('');
   // Source type: file (uploaded), url (link), or tts (legacy/text-only)
   const srcType = item.audioType==='file' ? 'file' : item.audioType==='url' ? 'url' : 'tts';
@@ -3505,7 +3515,7 @@ function ttsBuildCard(item,i){
             <div class="tts-title" title="${escHtml(item.title)}">${escHtml(item.title)}</div>
             <div class="tts-badges"><span class="sc-type-badge">📝 ${sentences.length} جملة</span>${srtBadge}</div>
           </div>
-          ${isAdmin?`<button class="tts-del-btn" onclick="event.stopPropagation();ttsDelete(${i})" title="حذف">🗑</button>`:''}
+          ${isAdmin?`<div style="display:flex;flex-direction:column;gap:4px"><button class="tts-del-btn" onclick="event.stopPropagation();ttsDelete(${i})" title="حذف">🗑</button><button class="tts-del-btn" onclick="event.stopPropagation();ttsUpdateSrt(${i})" title="تحديث SRT" style="background:color-mix(in srgb,var(--teal) 12%,transparent);color:var(--teal)">⏱</button></div>`:''}
         </div>
       </div>
     </div>
@@ -3610,7 +3620,7 @@ function ttsSyncSentenceWithAudio(i, currentTime){
 /* Like ttsRenderDictationState but does NOT touch audio playback */
 function ttsRenderDictationStateNoAudio(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
-  const sentences=ttsSplitSentences(item.text);const si=st.sentIdx;
+  const sentences=ttsGetSentences(item);const si=st.sentIdx;
   const num=document.getElementById('tts-sent-num-'+i);if(num)num.textContent=(si+1);
   const inp=document.getElementById('tts-input-'+i);
   const area=document.getElementById('tts-input-area-'+i);
@@ -3637,7 +3647,7 @@ function ttsRenderDictationStateNoAudio(i){
 /* ── Render dictation state ── */
 function ttsRenderDictationState(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
-  const sentences=ttsSplitSentences(item.text);const si=st.sentIdx;
+  const sentences=ttsGetSentences(item);const si=st.sentIdx;
   const numEl=document.getElementById('tts-sent-num-'+i);if(numEl)numEl.textContent=Math.min(si+1,sentences.length);
   sentences.forEach((_,k)=>{const dot=document.getElementById('tts-dot-'+i+'-'+k);if(!dot)return;dot.className='tts-sent-dot';if(k<si)dot.classList.add(st.scores[k]===true?'done-ok':'done-wrong');else if(k===si)dot.classList.add('current');});
   const inp=document.getElementById('tts-input-'+i);const area=document.getElementById('tts-input-area-'+i);
@@ -3674,7 +3684,7 @@ function ttsGetAudioEl(i){
 
 function ttsPlaySentence(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
-  const sentences=ttsSplitSentences(item.text);const si=st.sentIdx;if(si>=sentences.length)return;
+  const sentences=ttsGetSentences(item);const si=st.sentIdx;if(si>=sentences.length)return;
   const text=sentences[si];
 
   // Cancel any TTS playback first
@@ -3697,18 +3707,34 @@ function ttsPlaySentence(i){
     let startTime = 0, endTime = Infinity;
     const srtCues = item.srtCues;
     if(srtCues && srtCues[si]){
-      startTime = srtCues[si].start;
-      endTime = srtCues[si].end;
+      startTime = Number(srtCues[si].start) || 0;
+      endTime = Number(srtCues[si].end) || Infinity;
     } else {
-      // Fall back to detected timings
       const timings = _ttsTimingsCache[item.id];
       if(timings && timings[si]!=null){
-        startTime = timings[si];
-        endTime = timings[si+1] != null ? timings[si+1] : (audio.duration || Infinity);
+        startTime = Number(timings[si]) || 0;
+        endTime = timings[si+1] != null ? Number(timings[si+1]) : (audio.duration || Infinity);
       }
     }
 
-    console.log('[TTS] play sentence', si+1, 'from', startTime, 'to', endTime, 'srtCues:', !!srtCues);
+    console.log('[TTS] play sentence', si+1, 'from', startTime, 'to', endTime, 'srtCues:', !!srtCues, 'item.srtCues length:', srtCues?.length);
+
+    // Helper: stop playback at sentence end
+    let stopped = false;
+    const stopAtEnd = () => {
+      if(stopped) return;
+      stopped = true;
+      audio.pause();
+      // Clear the polling interval
+      if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
+      ttsIsPaused = true;
+      st.paused = true;
+      ttsUpdateButtons(i,'▶',false);
+      ttsShowPostPlay(i);
+    };
+
+    // Clear any prior interval from previous play call
+    if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
 
     // Seek to sentence start
     audio.currentTime = startTime;
@@ -3718,32 +3744,23 @@ function ttsPlaySentence(i){
       const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
     };
 
-    // Use a flag to prevent multiple stop triggers
-    let stopped = false;
     audio.ontimeupdate=()=>{
       if(stopped)return;
       ttsElapsed=audio.currentTime;
       ttsUpdateProgress(i,audio.currentTime,audio.duration||0);
-      // STOP when we reach the end of the current sentence
-      if(audio.currentTime >= endTime){
-        stopped = true;
-        audio.pause();
-        ttsIsPaused=true;
-        st.paused=true;
-        ttsUpdateButtons(i,'▶',false);
-        ttsShowPostPlay(i);
-      }
+      if(audio.currentTime >= endTime) stopAtEnd();
     };
-    audio.onended=()=>{
-      if(stopped)return;
-      stopped = true;
-      ttsIsPaused=false;ttsUpdateButtons(i,'▶',false);
-      ttsShowPostPlay(i);
-    };
+    audio.onended=()=>stopAtEnd();
     audio.onerror=()=>{
       console.warn('Audio load error');
       ttsUpdateButtons(i,'▶',false);
     };
+
+    // Also poll every 60ms (ontimeupdate fires too slowly, ~250ms)
+    audio._ttsStopInterval = setInterval(()=>{
+      if(stopped){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;return;}
+      if(!audio.paused && audio.currentTime >= endTime) stopAtEnd();
+    }, 60);
 
     audio.play().then(()=>{
       ttsUpdateButtons(i,'⏸',true);
@@ -3808,7 +3825,7 @@ function ttsSentReplay(i){
   }
 
   // Legacy TTS replay
-  const sentences=ttsSplitSentences(item.text);const text=sentences[st.sentIdx]||'';
+  const sentences=ttsGetSentences(item);const text=sentences[st.sentIdx]||'';
   window.speechSynthesis.cancel();if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
   const voices=ttsGetGermanVoices();const sel=document.getElementById('ttsVoiceSel-'+i);
   const vIdx=sel?parseInt(sel.dataset.vidx||sel.value||'0'):0;const voice=voices[vIdx]||voices[0]||null;
@@ -3870,7 +3887,7 @@ function ttsStopCurrent(){
 /* ── Next sentence ── */
 function ttsSentNext(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
-  const sentences=ttsSplitSentences(item.text);st.sentIdx++;
+  const sentences=ttsGetSentences(item);st.sentIdx++;
   if(st.sentIdx>=sentences.length){ttsShowComplete(i);return;}
 
   // For external audio, seek to the next sentence's start time
@@ -3901,7 +3918,7 @@ function ttsJumpTo(i,si){
   ttsPlaySentence(i);
 }
 function ttsShowComplete(i){
-  const st=ttsGetState(i);const sentences=ttsSplitSentences(ttsItems[i]?.text||'');
+  const st=ttsGetState(i);const sentences=ttsGetSentences(ttsItems[i]);
   const correct=st.scores.filter(v=>v===true).length;const total=sentences.length;const pct=Math.round(correct/total*100);
   const emoji=pct===100?'🏆':pct>=70?'🎉':pct>=50?'👍':'💪';
   window.speechSynthesis.cancel();ttsUpdateButtons(i,'▶',false);
@@ -3994,7 +4011,7 @@ function ttsEvaluate(sentenceIndex, expected, userText){
 
 function ttsCheckAnswer(i){
   const st=ttsGetState(i);
-  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');
+  const sentences=ttsGetSentences(ttsItems[i]);
   const correct=sentences[st.sentIdx]||'';
   const inp=document.getElementById('tts-input-'+i);
   const userVal=(inp?.value||'').trim();
@@ -4101,7 +4118,7 @@ function ttsDiffHTML(user,correct){
 // hintLevel 0=none, 1=first word, 2=first 2 words, 3=all words shown
 function ttsRequestHint(i){
   const st=ttsGetState(i);if(st.checked)return;
-  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');const correct=sentences[st.sentIdx]||'';
+  const sentences=ttsGetSentences(ttsItems[i]);const correct=sentences[st.sentIdx]||'';
   st.hintLevel=(st.hintLevel||0)+1;
   ttsShowHint(i,correct,st.hintLevel);
   // hide the hint-req button after first press (more hint btn takes over)
@@ -4162,7 +4179,7 @@ function ttsShowHint(i,correct,level){
 
 function ttsShowMoreHint(i){
   const st=ttsGetState(i);
-  const sentences=ttsSplitSentences(ttsItems[i]?.text||'');const correct=sentences[st.sentIdx]||'';
+  const sentences=ttsGetSentences(ttsItems[i]);const correct=sentences[st.sentIdx]||'';
   st.hintLevel=(st.hintLevel||1)+1;
   ttsShowHint(i,correct,st.hintLevel);
 }
@@ -4239,7 +4256,7 @@ function ttsUpdateProgress(i,elapsed,duration){
 function ttsRafLoop(i){ttsRafId=requestAnimationFrame(()=>{if(ttsIsPaused||ttsCurrent!==i)return;ttsElapsed=(performance.now()-ttsStartTime)/1000;ttsUpdateProgress(i,Math.min(ttsElapsed,ttsDuration),ttsDuration);if(ttsElapsed<ttsDuration+1)ttsRafLoop(i);});}
 
 /* ── Speed / Voice / Volume ── */
-function ttsSetSpeed(i,s,btn){ttsRate=s;btn.closest('.tts-speed-group').querySelectorAll('.tts-speed-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const item=ttsItems[i];if(item){ttsDuration=ttsEstimateDuration(ttsSplitSentences(item.text)[ttsGetState(i).sentIdx]||'',s);const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);}if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
+function ttsSetSpeed(i,s,btn){ttsRate=s;btn.closest('.tts-speed-group').querySelectorAll('.tts-speed-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const item=ttsItems[i];if(item){ttsDuration=ttsEstimateDuration(ttsGetSentences(item)[ttsGetState(i).sentIdx]||'',s);const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);}if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
 function ttsSetVoice(i,idx){const sel=document.getElementById('ttsVoiceSel-'+i);if(sel)sel.dataset.vidx=idx;ttsVoiceIdx=parseInt(idx)||0;if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
 function ttsSetVolCard(i,v){ttsVolume=parseFloat(v);const icon=document.getElementById('tts-vol-icon-'+i);if(icon)icon.textContent=ttsVolume===0?'🔇':ttsVolume<0.5?'🔉':'🔊';if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
 function ttsMuteToggle(i){const slider=document.getElementById('tts-vol-'+i);if(!slider)return;if(ttsVolume>0){ttsPrevVolume=ttsVolume;ttsVolume=0;slider.value=0;}else{ttsVolume=ttsPrevVolume||1;slider.value=ttsVolume;}ttsSetVolCard(i,ttsVolume);}
@@ -4324,6 +4341,37 @@ function ttsSwitchSrc(which){
     fileTab.style.cssText='flex:1;padding:8px;border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer';
     urlPanel.style.display='';filePanel.style.display='none';
   }
+}
+
+/* Admin: attach/update SRT to an existing item */
+function ttsUpdateSrt(i){
+  const item = ttsItems[i];
+  if(!item) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.srt,.vtt,text/srt,text/plain';
+  input.onchange = async (ev)=>{
+    const file = ev.target.files?.[0];
+    if(!file) return;
+    try{
+      const content = await file.text();
+      const cues = ttsParseSrt(content);
+      if(cues.length === 0){alert('تعذر قراءة ملف SRT');return;}
+      item.srtCues = cues;
+      // Optionally refresh the text from SRT
+      if(confirm(`تم العثور على ${cues.length} جملة. هل تريد استبدال النص بالنص من SRT؟`)){
+        item.text = cues.map(c=>c.text).join('\n');
+      }
+      ttsSaveLocal();
+      if(window._ttsFireSave)try{window._ttsFireSave(item);}catch(e){}
+      // Clear caches so it re-analyzes
+      delete _ttsTimingsCache[item.id];
+      delete _ttsWaveformCache[item.id];
+      ttsRenderCards();
+      alert(`✅ تم تحديث ${cues.length} جملة بتوقيتات SRT`);
+    } catch(e){alert('خطأ في قراءة الملف');}
+  };
+  input.click();
 }
 
 /* ── SRT/VTT parser ── */
