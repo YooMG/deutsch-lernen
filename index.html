@@ -727,6 +727,9 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-waveform{height:64px;background:var(--paper-2);border-radius:10px;margin-bottom:6px;display:flex;align-items:center;justify-content:flex-start;gap:2px;overflow:hidden;padding:8px 12px;position:relative;cursor:pointer;border:1px solid var(--line)}
 .tts-bar{width:3px;border-radius:2px;background:color-mix(in srgb,var(--ink-soft) 30%,transparent);transition:background .12s;flex:none}
 .tts-bar.played{background:var(--teal)}
+.tts-bar.current-sentence{background:var(--rust)}
+.tts-sent-marker{position:absolute;top:4px;bottom:4px;width:2px;background:color-mix(in srgb,var(--rust) 60%,transparent);pointer-events:none;z-index:2}
+.tts-sent-marker::before{content:attr(data-num);position:absolute;top:-2px;left:3px;font-size:9px;color:var(--rust);font-weight:700}
 .tts-waveform.tts-wf-active .tts-bar.played{animation:ttsBarPulse 1.2s ease-in-out infinite}
 .tts-waveform.tts-wf-active .tts-bar.played:nth-child(2n){animation-delay:.15s}
 .tts-waveform.tts-wf-active .tts-bar.played:nth-child(3n){animation-delay:.3s}
@@ -3261,69 +3264,196 @@ function ttsSeekFromWaveform(ev, i){
 
 /* ── Analyze real audio file and render true waveform ── */
 const _ttsWaveformCache = {};
+const _ttsTimingsCache = {};   // sentence start times per item
+
+async function ttsAnalyzeAudio(i){
+  const item = ttsItems[i];
+  if(!item || !item.audioUrl) return null;
+
+  // Return cached if available
+  if(_ttsWaveformCache[item.id] && _ttsTimingsCache[item.id]){
+    return { peaks: _ttsWaveformCache[item.id], timings: _ttsTimingsCache[item.id] };
+  }
+
+  try{
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return null;
+    const ctx = new AudioCtx();
+
+    // Fetch and decode audio
+    let arrayBuffer;
+    if(item.audioUrl.startsWith('data:')){
+      const base64 = item.audioUrl.split(',')[1] || '';
+      const bin = atob(base64);
+      const buf = new Uint8Array(bin.length);
+      for(let k=0;k<bin.length;k++) buf[k] = bin.charCodeAt(k);
+      arrayBuffer = buf.buffer;
+    } else {
+      const resp = await fetch(item.audioUrl, {mode:'cors'});
+      arrayBuffer = await resp.arrayBuffer();
+    }
+
+    const audioBuf = await ctx.decodeAudioData(arrayBuffer);
+    const channelData = audioBuf.getChannelData(0);
+    const sampleRate = audioBuf.sampleRate;
+    const duration = audioBuf.duration;
+
+    // ── 1. Compute peaks for waveform visualization ──
+    const BAR_COUNT = 90;
+    const blockSize = Math.floor(channelData.length / BAR_COUNT);
+    const peaks = [];
+    let maxPeak = 0;
+    for(let k=0; k<BAR_COUNT; k++){
+      let sum = 0;
+      const start = k * blockSize;
+      for(let j=0; j<blockSize; j++) sum += Math.abs(channelData[start+j] || 0);
+      const avg = sum / blockSize;
+      peaks.push(avg);
+      if(avg > maxPeak) maxPeak = avg;
+    }
+    const normalizedPeaks = maxPeak > 0 ? peaks.map(p => p/maxPeak) : peaks;
+    _ttsWaveformCache[item.id] = normalizedPeaks;
+
+    // ── 2. Determine sentence timings — prefer SRT cues if provided ──
+    const sentences = ttsSplitSentences(item.text);
+    let timings;
+    if(item.srtCues && Array.isArray(item.srtCues) && item.srtCues.length > 0){
+      // Use exact SRT start times
+      timings = item.srtCues.map(c => c.start);
+      // Pad/truncate to match sentence count
+      while(timings.length < sentences.length){
+        // Last sentence falls between last SRT end and audio end
+        const lastEnd = item.srtCues[item.srtCues.length-1]?.end || duration;
+        timings.push(Math.min(lastEnd, duration));
+      }
+      timings = timings.slice(0, sentences.length);
+    } else {
+      // Fall back to silence detection
+      timings = ttsDetectSentenceTimings(channelData, sampleRate, duration, sentences);
+    }
+    _ttsTimingsCache[item.id] = timings;
+
+    try{ ctx.close(); }catch(e){}
+    return { peaks: normalizedPeaks, timings };
+  } catch(e){
+    console.warn('Audio analysis failed:', e);
+    return null;
+  }
+}
+
+/* Detect sentence boundaries via silence detection + char-weighted distribution */
+function ttsDetectSentenceTimings(channelData, sampleRate, duration, sentences){
+  const numSentences = sentences.length;
+  if(numSentences === 0) return [];
+
+  // Build amplitude envelope (RMS in small windows)
+  const WINDOW_MS = 20;
+  const windowSize = Math.floor(sampleRate * WINDOW_MS / 1000);
+  const envelope = [];
+  for(let i=0; i<channelData.length; i+=windowSize){
+    let sum=0, n=0;
+    for(let j=0; j<windowSize && i+j<channelData.length; j++){
+      sum += channelData[i+j] * channelData[i+j];
+      n++;
+    }
+    envelope.push(Math.sqrt(sum/n));
+  }
+
+  // Determine noise floor (silence threshold) = ~15% of average non-zero amplitude
+  const sorted = envelope.slice().sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length/2)] || 0.01;
+  const threshold = Math.max(0.005, median * 0.6);
+
+  // Find silence regions (>= 250ms of silence = potential sentence break)
+  const MIN_SILENCE_MS = 250;
+  const minSilenceWindows = Math.ceil(MIN_SILENCE_MS / WINDOW_MS);
+  const silenceGaps = []; // {start, end, midSec}
+  let curStart = -1;
+  for(let k=0; k<envelope.length; k++){
+    if(envelope[k] < threshold){
+      if(curStart < 0) curStart = k;
+    } else {
+      if(curStart >= 0 && (k - curStart) >= minSilenceWindows){
+        const startSec = curStart * WINDOW_MS / 1000;
+        const endSec = k * WINDOW_MS / 1000;
+        silenceGaps.push({start: startSec, end: endSec, midSec: (startSec+endSec)/2});
+      }
+      curStart = -1;
+    }
+  }
+  // Trailing silence
+  if(curStart >= 0 && (envelope.length - curStart) >= minSilenceWindows){
+    const startSec = curStart * WINDOW_MS / 1000;
+    silenceGaps.push({start: startSec, end: duration, midSec: (startSec+duration)/2});
+  }
+
+  // ── Strategy: use silence gaps as sentence boundaries when count matches ──
+  // We need (numSentences - 1) boundaries between sentences.
+  // Pick the strongest gaps (longest silences) and sort by time.
+  const internalGapsNeeded = numSentences - 1;
+  let chosenBoundaries = [];
+
+  if(silenceGaps.length >= internalGapsNeeded && internalGapsNeeded > 0){
+    // Sort by gap length, pick top N, then re-sort by time
+    const ranked = silenceGaps.slice().sort((a,b)=>(b.end-b.start)-(a.end-a.start));
+    chosenBoundaries = ranked.slice(0, internalGapsNeeded)
+                              .map(g=>g.midSec)
+                              .sort((a,b)=>a-b);
+  } else {
+    // Fallback: distribute by character count weight
+    const totalChars = sentences.reduce((s,sent)=>s+sent.length,0) || 1;
+    let acc = 0;
+    for(let s=0; s<numSentences-1; s++){
+      acc += sentences[s].length;
+      chosenBoundaries.push((acc/totalChars) * duration);
+    }
+  }
+
+  // Build start time array: [0, b0, b1, ..., bN-2]
+  const timings = [0];
+  for(const b of chosenBoundaries) timings.push(b);
+  return timings;
+}
+
 async function ttsRenderRealWaveform(i){
   const item = ttsItems[i];
   if(!item || !item.audioUrl) return;
   const wf = document.getElementById('tts-wf-'+i);
   if(!wf) return;
 
-  // Use cache if we've already analyzed this audio
-  let peaks = _ttsWaveformCache[item.id];
-  if(!peaks){
-    try{
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if(!AudioCtx) return; // browser doesn't support, keep random bars
-      const ctx = new AudioCtx();
+  const result = await ttsAnalyzeAudio(i);
+  if(!result) return;
 
-      // Fetch and decode audio
-      let arrayBuffer;
-      if(item.audioUrl.startsWith('data:')){
-        // base64 data URL
-        const base64 = item.audioUrl.split(',')[1] || '';
-        const bin = atob(base64);
-        const len = bin.length;
-        const buf = new Uint8Array(len);
-        for(let k=0;k<len;k++) buf[k] = bin.charCodeAt(k);
-        arrayBuffer = buf.buffer;
-      } else {
-        const resp = await fetch(item.audioUrl, {mode:'cors'});
-        arrayBuffer = await resp.arrayBuffer();
-      }
-
-      const audioBuf = await ctx.decodeAudioData(arrayBuffer);
-      const channelData = audioBuf.getChannelData(0); // mono / first channel
-      const BAR_COUNT = 90;
-      const blockSize = Math.floor(channelData.length / BAR_COUNT);
-      peaks = [];
-      let maxPeak = 0;
-      for(let k=0; k<BAR_COUNT; k++){
-        let sum = 0;
-        const start = k * blockSize;
-        for(let j=0; j<blockSize; j++){
-          sum += Math.abs(channelData[start+j] || 0);
-        }
-        const avg = sum / blockSize;
-        peaks.push(avg);
-        if(avg > maxPeak) maxPeak = avg;
-      }
-      // Normalize 0..1
-      if(maxPeak > 0) peaks = peaks.map(p => p/maxPeak);
-      _ttsWaveformCache[item.id] = peaks;
-      try{ ctx.close(); }catch(e){}
-    } catch(e){
-      console.warn('Waveform analysis failed:', e);
-      return; // keep placeholder random bars
-    }
-  }
-
-  // Render peaks into bars
+  // Render peaks
   const bars = wf.querySelectorAll('.tts-bar');
-  peaks.forEach((p, k) => {
+  result.peaks.forEach((p, k) => {
     if(bars[k]){
       const h = Math.max(4, Math.round(p * 48));
       bars[k].style.height = h + 'px';
     }
   });
+
+  // Remove old markers, then add sentence boundary markers
+  wf.querySelectorAll('.tts-sent-marker').forEach(m=>m.remove());
+  const audio = ttsGetAudioEl(i);
+  const placeMarkers = (dur)=>{
+    if(!dur || !result.timings) return;
+    wf.querySelectorAll('.tts-sent-marker').forEach(m=>m.remove());
+    result.timings.forEach((t, idx) => {
+      if(idx === 0) return;
+      const pct = (t / dur) * 100;
+      const marker = document.createElement('div');
+      marker.className = 'tts-sent-marker';
+      marker.dataset.num = (idx+1);
+      marker.style.left = pct + '%';
+      wf.appendChild(marker);
+    });
+  };
+  if(audio?.duration){
+    placeMarkers(audio.duration);
+  } else if(audio){
+    audio.addEventListener('loadedmetadata', ()=>placeMarkers(audio.duration), {once:true});
+  }
 }
 
 /* ── Render section ── */
@@ -3360,6 +3490,8 @@ function ttsBuildCard(item,i){
   const srcLabel = srcType==='file' ? '🎵 صوت · ملف' : srcType==='url' ? '🔗 صوت · رابط' : '🔊 نص · TTS';
   const artIcon = srcType==='file' ? '🎵' : srcType==='url' ? '🔗' : '📖';
   const hasExternalAudio = srcType!=='tts';
+  const hasSrt = !!(item.srtCues && item.srtCues.length>0);
+  const srtBadge = hasSrt ? '<span class="sc-type-badge" style="background:color-mix(in srgb,var(--green) 18%,var(--card));color:var(--green);border-color:color-mix(in srgb,var(--green) 40%,transparent)">⏱ SRT متزامن</span>' : '';
 
   const card=document.createElement('div');
   card.className='tts-card';card.id='tts-card-'+i;
@@ -3371,7 +3503,7 @@ function ttsBuildCard(item,i){
           <div class="tts-info">
             <div class="tts-label">${srcLabel} <span class="niv-badge ${niv}">${niv}</span></div>
             <div class="tts-title" title="${escHtml(item.title)}">${escHtml(item.title)}</div>
-            <div class="tts-badges"><span class="sc-type-badge">📝 ${sentences.length} جملة</span></div>
+            <div class="tts-badges"><span class="sc-type-badge">📝 ${sentences.length} جملة</span>${srtBadge}</div>
           </div>
           ${isAdmin?`<button class="tts-del-btn" onclick="event.stopPropagation();ttsDelete(${i})" title="حذف">🗑</button>`:''}
         </div>
@@ -3455,12 +3587,70 @@ function ttsOpenCard(i){
   const card=document.getElementById('tts-card-'+i);if(card)card.classList.add('tts-playing');
   ttsCardState[i]={sentIdx:0,scores:[],checked:false,paused:false};
   ttsRenderDictationState(i);
-  // For external audio (file/url): render the real waveform from the audio data
+
   const item=ttsItems[i];
   if(item&&item.audioUrl){
-    ttsRenderRealWaveform(i);
+    // Analyze audio FIRST (waveform + sentence timings), then start playback
+    ttsAnalyzeAudio(i).then(()=>{
+      ttsRenderRealWaveform(i);
+      ttsPlaySentence(i);
+    }).catch(()=>ttsPlaySentence(i));
+  } else {
+    ttsPlaySentence(i);
   }
-  ttsPlaySentence(i);
+}
+
+/* Sync the current sentence index with the audio's playback time */
+function ttsSyncSentenceWithAudio(i, currentTime){
+  const item = ttsItems[i];
+  if(!item || !item.audioUrl) return;
+  const timings = _ttsTimingsCache[item.id];
+  if(!timings || timings.length===0) return;
+
+  const st = ttsGetState(i);
+  if(st.checked) return; // don't auto-jump after user submitted
+
+  // Find which sentence this currentTime belongs to
+  let newIdx = 0;
+  for(let k=0; k<timings.length; k++){
+    if(currentTime >= timings[k]) newIdx = k;
+    else break;
+  }
+  // Only switch if user is on a previous sentence (don't jump backwards or past)
+  if(newIdx !== st.sentIdx && newIdx > st.sentIdx){
+    // Move to the new sentence without restarting audio
+    st.sentIdx = newIdx;
+    st.checked = false;
+    st.hintLevel = 0;
+    ttsRenderDictationStateNoAudio(i);
+  }
+}
+
+/* Like ttsRenderDictationState but does NOT touch audio playback */
+function ttsRenderDictationStateNoAudio(i){
+  const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
+  const sentences=ttsSplitSentences(item.text);const si=st.sentIdx;
+  const num=document.getElementById('tts-sent-num-'+i);if(num)num.textContent=(si+1);
+  const inp=document.getElementById('tts-input-'+i);
+  const area=document.getElementById('tts-input-area-'+i);
+  const fb=document.getElementById('tts-feedback-'+i);
+  const hintArea=document.getElementById('tts-hint-'+i);
+  const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
+  const checkBtn=document.getElementById('tts-check-btn-'+i);
+  const replayBtn=document.getElementById('tts-replay-btn-'+i);
+  const nextBtn=document.getElementById('tts-next-btn-'+i);
+  const kbHint=document.getElementById('tts-kb-hint-'+i);
+  if(inp){inp.value='';inp.disabled=false;}if(area)area.className='tts-input-area';
+  if(fb){fb.textContent='';fb.className='tts-feedback';}
+  if(hintArea)hintArea.classList.remove('visible');
+  if(hintReqBtn)hintReqBtn.style.display='';
+  if(checkBtn)checkBtn.style.display='';
+  if(replayBtn)replayBtn.style.display='none';
+  if(nextBtn)nextBtn.style.display='none';
+  if(kbHint)kbHint.textContent='Enter = تحقق';
+  st.checked=false;st.hintLevel=0;
+  sentences.forEach((_,k)=>{const p=document.getElementById('tts-ts-'+i+'-'+k);if(p)p.style.background=k===si?'color-mix(in srgb,var(--teal) 15%,var(--card))':'';});
+  setTimeout(()=>inp?.focus(),100);
 }
 
 /* ── Render dictation state ── */
@@ -3529,6 +3719,8 @@ function ttsPlaySentence(i){
     audio.ontimeupdate=()=>{
       ttsElapsed=audio.currentTime;
       ttsUpdateProgress(i,audio.currentTime,audio.duration||0);
+      // ── Auto-sync: move to the sentence corresponding to current time ──
+      ttsSyncSentenceWithAudio(i, audio.currentTime);
     };
     audio.onended=()=>{
       ttsIsPaused=false;ttsUpdateButtons(i,'▶',false);
@@ -3585,10 +3777,18 @@ function ttsSentReplay(i){
   if(ttsCurrent!==i)return;
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
 
-  // If external audio, just rewind and play
+  // If external audio, seek to current sentence start (NOT audio start)
   if(item.audioUrl){
     const audio=ttsGetAudioEl(i);
-    if(audio){audio.currentTime=0;ttsPlaySentence(i);}
+    const timings=_ttsTimingsCache[item.id];
+    if(audio){
+      if(timings && timings[st.sentIdx]!=null){
+        audio.currentTime=timings[st.sentIdx];
+      } else {
+        audio.currentTime=0;
+      }
+      ttsPlaySentence(i);
+    }
     return;
   }
 
@@ -3657,9 +3857,34 @@ function ttsSentNext(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
   const sentences=ttsSplitSentences(item.text);st.sentIdx++;
   if(st.sentIdx>=sentences.length){ttsShowComplete(i);return;}
-  ttsRenderDictationState(i);ttsPlaySentence(i);
+
+  // For external audio, seek to the next sentence's start time
+  if(item.audioUrl){
+    const audio=ttsGetAudioEl(i);
+    const timings=_ttsTimingsCache[item.id];
+    if(audio && timings && timings[st.sentIdx]!=null){
+      audio.currentTime=timings[st.sentIdx];
+    }
+  }
+
+  ttsRenderDictationState(i);
+  ttsPlaySentence(i);
 }
-function ttsJumpTo(i,si){if(ttsCurrent!==i){ttsOpenCard(i);return;}const st=ttsGetState(i);st.sentIdx=si;ttsRenderDictationState(i);ttsPlaySentence(i);}
+function ttsJumpTo(i,si){
+  if(ttsCurrent!==i){ttsOpenCard(i);return;}
+  const st=ttsGetState(i);st.sentIdx=si;
+  const item=ttsItems[i];
+  // For external audio: seek to that sentence's timing
+  if(item && item.audioUrl){
+    const audio=ttsGetAudioEl(i);
+    const timings=_ttsTimingsCache[item.id];
+    if(audio && timings && timings[si]!=null){
+      audio.currentTime=timings[si];
+    }
+  }
+  ttsRenderDictationState(i);
+  ttsPlaySentence(i);
+}
 function ttsShowComplete(i){
   const st=ttsGetState(i);const sentences=ttsSplitSentences(ttsItems[i]?.text||'');
   const correct=st.scores.filter(v=>v===true).length;const total=sentences.length;const pct=Math.round(correct/total*100);
@@ -4014,6 +4239,13 @@ function ttsOpenAddModal(){
     <div class="fld" style="margin-top:10px">
       <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">النص المرجعي الكامل (جملة لكل سطر)</label>
       <textarea class="tts-modal-textarea" id="ttsAddText" placeholder="Guten Morgen!&#10;Wie geht es Ihnen?&#10;Ich heiße Klaus."></textarea>
+      <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">💡 سيُملأ تلقائياً عند رفع ملف SRT أدناه</div>
+    </div>
+
+    <div class="fld" style="margin-top:10px">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:6px">⏱ ملف SRT (اختياري لكن مُوصى به)</label>
+      <input id="ttsAddSrt" type="file" accept=".srt,.vtt,text/srt,text/plain" onchange="ttsHandleSrtUpload(event)" style="width:100%;padding:9px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font-family:inherit;font-size:13px;color:var(--ink);outline:none">
+      <div id="ttsSrtStatus" style="font-size:11px;color:var(--ink-soft);margin-top:4px">رفع ملف SRT يُمكّن التزامن الدقيق بين الصوت والجمل</div>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -4043,6 +4275,66 @@ function ttsSwitchSrc(which){
   }
 }
 
+/* ── SRT/VTT parser ── */
+function ttsParseSrt(content){
+  /* Returns array of {start, end, text} objects in seconds */
+  const result = [];
+  if(!content) return result;
+  // Normalize line endings, strip WEBVTT header if present
+  const normalized = content.replace(/\r\n/g, '\n').replace(/^WEBVTT.*?\n\n/s, '');
+  // Split into blocks separated by blank lines
+  const blocks = normalized.split(/\n\s*\n/);
+  for(const block of blocks){
+    const lines = block.trim().split('\n').filter(l=>l.trim());
+    if(lines.length < 2) continue;
+    // Find the timing line (contains -->)
+    const tIdx = lines.findIndex(l => l.includes('-->'));
+    if(tIdx < 0) continue;
+    const timing = lines[tIdx];
+    const m = timing.match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/);
+    if(!m) continue;
+    const start = +m[1]*3600 + +m[2]*60 + +m[3] + +m[4]/1000;
+    const end   = +m[5]*3600 + +m[6]*60 + +m[7] + +m[8]/1000;
+    const text = lines.slice(tIdx+1).join(' ').replace(/<[^>]+>/g,'').trim();
+    if(text) result.push({start, end, text});
+  }
+  return result;
+}
+
+/* When admin uploads SRT, parse it and auto-fill the text + remember timings */
+window._ttsPendingSrt = null;
+async function ttsHandleSrtUpload(ev){
+  const file = ev.target.files?.[0];
+  const statusEl = document.getElementById('ttsSrtStatus');
+  if(!file){
+    window._ttsPendingSrt = null;
+    if(statusEl) statusEl.textContent='رفع ملف SRT يُمكّن التزامن الدقيق بين الصوت والجمل';
+    return;
+  }
+  try{
+    const content = await file.text();
+    const cues = ttsParseSrt(content);
+    if(cues.length === 0){
+      if(statusEl){statusEl.textContent='⚠️ تعذر قراءة ملف SRT';statusEl.style.color='var(--rust)';}
+      window._ttsPendingSrt = null;
+      return;
+    }
+    window._ttsPendingSrt = cues;
+    // Auto-fill the textarea
+    const textArea = document.getElementById('ttsAddText');
+    if(textArea){
+      textArea.value = cues.map(c=>c.text).join('\n');
+    }
+    if(statusEl){
+      statusEl.textContent = `✅ تم تحميل ${cues.length} جملة من SRT بتوقيتات دقيقة`;
+      statusEl.style.color = 'var(--green)';
+    }
+  } catch(e){
+    if(statusEl){statusEl.textContent='⚠️ خطأ في قراءة الملف';statusEl.style.color='var(--rust)';}
+    window._ttsPendingSrt = null;
+  }
+}
+
 async function ttsConfirmAdd(){
   const title=(document.getElementById('ttsAddTitle')?.value||'').trim();
   const text=(document.getElementById('ttsAddText')?.value||'').trim();
@@ -4061,7 +4353,6 @@ async function ttsConfirmAdd(){
     if(file.size>5*1024*1024){
       if(!confirm('الملف كبير ('+Math.round(file.size/1024/1024)+'MB). قد يتعذر حفظه. متابعة؟'))return;
     }
-    // Convert to base64 data URL for storage
     audioData=await new Promise((res,rej)=>{
       const r=new FileReader();
       r.onload=()=>res(r.result);
@@ -4080,8 +4371,13 @@ async function ttsConfirmAdd(){
   }
 
   const item={id:'tts-'+Date.now(),title,text,niveau,audioUrl,audioType,createdAt:Date.now()};
+  // Attach SRT cues (timings) if uploaded
+  if(window._ttsPendingSrt && Array.isArray(window._ttsPendingSrt) && window._ttsPendingSrt.length>0){
+    item.srtCues = window._ttsPendingSrt;
+  }
   ttsItems.push(item);ttsSaveLocal();
   if(window._ttsFireSave)try{window._ttsFireSave(item);}catch(e){console.warn(e);}
+  window._ttsPendingSrt = null;
   closeModal();ttsRenderCards();
 }
 
