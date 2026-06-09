@@ -3602,28 +3602,9 @@ function ttsOpenCard(i){
 
 /* Sync the current sentence index with the audio's playback time */
 function ttsSyncSentenceWithAudio(i, currentTime){
-  const item = ttsItems[i];
-  if(!item || !item.audioUrl) return;
-  const timings = _ttsTimingsCache[item.id];
-  if(!timings || timings.length===0) return;
-
-  const st = ttsGetState(i);
-  if(st.checked) return; // don't auto-jump after user submitted
-
-  // Find which sentence this currentTime belongs to
-  let newIdx = 0;
-  for(let k=0; k<timings.length; k++){
-    if(currentTime >= timings[k]) newIdx = k;
-    else break;
-  }
-  // Only switch if user is on a previous sentence (don't jump backwards or past)
-  if(newIdx !== st.sentIdx && newIdx > st.sentIdx){
-    // Move to the new sentence without restarting audio
-    st.sentIdx = newIdx;
-    st.checked = false;
-    st.hintLevel = 0;
-    ttsRenderDictationStateNoAudio(i);
-  }
+  // No-op: audio now auto-stops at each sentence boundary in ttsPlaySentence,
+  // so we don't need to auto-jump between sentences during playback.
+  return;
 }
 
 /* Like ttsRenderDictationState but does NOT touch audio playback */
@@ -3700,7 +3681,7 @@ function ttsPlaySentence(i){
   window.speechSynthesis.cancel();
   if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
 
-  // ── If item has external audio (file/url): play the FULL audio (not per-sentence) ──
+  // ── External audio path (file/url) ──
   if(item.audioUrl){
     const audio=ttsGetAudioEl(i);
     if(!audio){return;}
@@ -3712,19 +3693,45 @@ function ttsPlaySentence(i){
 
     ttsIsPaused=false;st.paused=false;
 
+    // Determine start and end times for THIS sentence
+    let startTime = 0, endTime = audio.duration || 0;
+    const srtCues = item.srtCues;
+    if(srtCues && srtCues[si]){
+      startTime = srtCues[si].start;
+      endTime = srtCues[si].end;
+    } else {
+      // Fall back to detected timings
+      const timings = _ttsTimingsCache[item.id];
+      if(timings && timings[si]!=null){
+        startTime = timings[si];
+        endTime = timings[si+1] != null ? timings[si+1] : (audio.duration || 0);
+      }
+    }
+
+    // Seek to sentence start
+    audio.currentTime = startTime;
+
     audio.onloadedmetadata=()=>{
       ttsDuration=audio.duration||0;
       const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
     };
+
+    // Stop at sentence boundary
     audio.ontimeupdate=()=>{
       ttsElapsed=audio.currentTime;
       ttsUpdateProgress(i,audio.currentTime,audio.duration||0);
-      // ── Auto-sync: move to the sentence corresponding to current time ──
-      ttsSyncSentenceWithAudio(i, audio.currentTime);
+      // STOP when we reach the end of the current sentence
+      if(audio.currentTime >= endTime - 0.05){
+        audio.pause();
+        ttsIsPaused=true;
+        st.paused=true;
+        ttsUpdateButtons(i,'▶',false);
+        // Show post-play UI (replay / check / input)
+        ttsShowPostPlay(i);
+      }
     };
     audio.onended=()=>{
       ttsIsPaused=false;ttsUpdateButtons(i,'▶',false);
-      ttsUpdateProgress(i,audio.duration,audio.duration);
       ttsShowPostPlay(i);
     };
     audio.onerror=()=>{
@@ -3764,12 +3771,14 @@ function ttsShowPostPlay(i){
   const replayBtn=document.getElementById('tts-replay-btn-'+i);
   const nextBtn=document.getElementById('tts-next-btn-'+i);
   const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
-  if(st.checked){
-    if(checkBtn)checkBtn.style.display='none';
-    if(hintReqBtn)hintReqBtn.style.display='none';
-  }
+  // After playback finishes: show replay & check, NO next button (auto-advance on correct)
+  if(checkBtn)checkBtn.style.display='';
   if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='inline-block';
+  if(nextBtn)nextBtn.style.display='none';
+  if(hintReqBtn)hintReqBtn.style.display='';
+  // Focus input so user can start typing immediately
+  const inp=document.getElementById('tts-input-'+i);
+  if(inp&&!inp.disabled)setTimeout(()=>inp.focus(),100);
 }
 
 /* ── Replay once (no loop) ── */
@@ -3978,7 +3987,7 @@ function ttsEvaluate(sentenceIndex, expected, userText){
 }
 
 function ttsCheckAnswer(i){
-  const st=ttsGetState(i);if(st.checked)return;st.checked=true;
+  const st=ttsGetState(i);
   const sentences=ttsSplitSentences(ttsItems[i]?.text||'');
   const correct=sentences[st.sentIdx]||'';
   const inp=document.getElementById('tts-input-'+i);
@@ -3987,10 +3996,9 @@ function ttsCheckAnswer(i){
   // Run evaluation
   const evalResult = ttsEvaluate(st.sentIdx + 1, correct, userVal);
   const ok = evalResult.passed;
-  st.scores[st.sentIdx] = ok;
-  // Store full evaluation for aggregation / final report
-  st.evaluations = st.evaluations || [];
-  st.evaluations[st.sentIdx] = evalResult;
+  // Track attempts so we can store final score
+  st.attempts = st.attempts || [];
+  st.attempts[st.sentIdx] = (st.attempts[st.sentIdx] || 0) + 1;
 
   const area=document.getElementById('tts-input-area-'+i);
   const fb=document.getElementById('tts-feedback-'+i);
@@ -4000,40 +4008,79 @@ function ttsCheckAnswer(i){
   const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
   const kbHint=document.getElementById('tts-kb-hint-'+i);
 
-  // stop audio when user submits
+  // Stop audio whenever user submits
   window.speechSynthesis.cancel();
   document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>a.pause());
   if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
   ttsUpdateButtons(i,'▶',false);
 
-  if(inp)inp.disabled=true;
-  if(checkBtn)checkBtn.style.display='none';
-  if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='inline-block';
-  if(kbHint)kbHint.textContent='Shift+Enter = التالية';
-
   if(ok){
+    // ✅ CORRECT — record success, auto-advance to next sentence
+    st.checked=true;
+    st.scores[st.sentIdx] = true;
+    st.evaluations = st.evaluations || [];
+    st.evaluations[st.sentIdx] = evalResult;
+
+    if(inp)inp.disabled=true;
     if(area)area.className='tts-input-area tts-correct';
-    if(fb){fb.className='tts-feedback tts-fb-correct';fb.innerHTML=`✅ Richtig! أحسنت! <span style="opacity:.7;font-size:11px">(${evalResult.score}%)</span>`;}
+    if(fb){
+      fb.className='tts-feedback tts-fb-correct';
+      fb.innerHTML=`✅ Richtig! أحسنت! <span style="opacity:.7;font-size:11px">(${evalResult.score}%)</span>`;
+    }
+    if(checkBtn)checkBtn.style.display='none';
+    if(replayBtn)replayBtn.style.display='none';
+    if(nextBtn)nextBtn.style.display='none';
     if(hintReqBtn)hintReqBtn.style.display='none';
     const hintArea=document.getElementById('tts-hint-'+i);if(hintArea)hintArea.classList.remove('visible');
-  } else {
-    if(area)area.className='tts-input-area tts-wrong';
-    if(fb){
-      fb.className='tts-feedback tts-fb-wrong';
-      fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct)+
-        `<div style="margin-top:6px;font-size:11px;opacity:.75">النتيجة: ${evalResult.score}% · صحيح: ${evalResult.correct_words.length} · خطأ: ${evalResult.wrong_words.length} · مفقود: ${evalResult.missing_words.length}${evalResult.extra_words.length?' · زائد: '+evalResult.extra_words.length:''}</div>`;
-    }
-    if(inp)inp.value=correct;
-    if(hintReqBtn)hintReqBtn.style.display='';
-    if(userVal===''){
-      if(hintReqBtn)hintReqBtn.style.display='none';
-      st.hintLevel=0;
-      ttsShowHint(i,correct,1);
-    }
+
+    const dot=document.getElementById('tts-dot-'+i+'-'+st.sentIdx);
+    if(dot)dot.className='tts-sent-dot done-ok';
+
+    // Auto-advance after a brief moment so user can see "Richtig!"
+    setTimeout(()=>{
+      const isLast = (st.sentIdx + 1) >= sentences.length;
+      if(isLast){
+        ttsShowComplete(i);
+        return;
+      }
+      st.sentIdx++;
+      st.hintLevel = 0;
+      ttsRenderDictationState(i);
+      ttsPlaySentence(i);
+    }, 900);
+    return;
   }
+
+  // ❌ WRONG — let user retry. Do NOT mark as checked, keep input enabled
+  st.scores[st.sentIdx] = false; // tentative — will become true if they pass later
+  st.evaluations = st.evaluations || [];
+  st.evaluations[st.sentIdx] = evalResult;
+
+  if(area)area.className='tts-input-area tts-wrong';
+  if(fb){
+    fb.className='tts-feedback tts-fb-wrong';
+    fb.innerHTML='❌ '+ttsDiffHTML(userVal,correct)+
+      `<div style="margin-top:6px;font-size:11px;opacity:.75">المحاولة ${st.attempts[st.sentIdx]} · النتيجة: ${evalResult.score}% · صحيح: ${evalResult.correct_words.length} · خطأ: ${evalResult.wrong_words.length} · مفقود: ${evalResult.missing_words.length}${evalResult.extra_words.length?' · زائد: '+evalResult.extra_words.length:''}</div>`+
+      `<div style="margin-top:4px;font-size:11px;opacity:.85;color:var(--amber)">💡 حاول مجدداً — استمع للجملة مرة أخرى</div>`;
+  }
+  // Keep input enabled and selected so they can retry
+  if(inp){inp.disabled=false;inp.focus();inp.select();}
+  if(checkBtn)checkBtn.style.display='';        // keep "تحقق" available
+  if(replayBtn)replayBtn.style.display='flex';   // allow replay
+  if(nextBtn)nextBtn.style.display='none';       // DO NOT show next on wrong
+  if(hintReqBtn)hintReqBtn.style.display='';     // hint button available
+  if(kbHint)kbHint.textContent='Enter = تحقق · أعد الاستماع 🔁';
+
+  // Auto-show hint progressively on each failed attempt
+  // Attempt 1: first word, Attempt 2: half, Attempt 3+: all
+  const attempt = st.attempts[st.sentIdx];
+  if(attempt >= 1){
+    st.hintLevel = Math.min(attempt, 3);
+    ttsShowHint(i, correct, st.hintLevel);
+  }
+
   const dot=document.getElementById('tts-dot-'+i+'-'+st.sentIdx);
-  if(dot)dot.className='tts-sent-dot '+(ok?'done-ok':'done-wrong');
+  if(dot)dot.className='tts-sent-dot done-wrong';
 }
 function ttsDiffHTML(user,correct){
   const uW=user.trim().split(/\s+/);const cW=correct.trim().split(/\s+/);let out='';const len=Math.max(uW.length,cW.length);
@@ -4158,11 +4205,9 @@ function ttsClearInput(i){
 function ttsHandleKey(e,i){
   if(e.key==='Enter'&&!e.shiftKey){
     e.preventDefault();
-    const st=ttsGetState(i);
-    if(!st.checked)ttsCheckAnswer(i);
-    else if(st.scores[st.sentIdx]===true)ttsSentNext(i);
+    // Enter always triggers check. On success, auto-advance happens.
+    ttsCheckAnswer(i);
   }
-  if(e.key==='Enter'&&e.shiftKey){e.preventDefault();const st=ttsGetState(i);if(st.checked)ttsSentNext(i);}
 }
 
 /* ── RAF loop + progress ── */
