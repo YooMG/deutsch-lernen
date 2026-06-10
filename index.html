@@ -3272,7 +3272,7 @@ function ttsSeekFromWaveform(ev, i){
   const targetTime = pct * buffer.duration;
 
   // Find which sentence this time belongs to, jump to that sentence
-  const srtCues = item.srtCues;
+  const srtCues = ttsGetCues(item);
   const sentences = ttsGetSentences(item);
   let targetIdx = 0;
   if(srtCues && srtCues.length){
@@ -3290,6 +3290,52 @@ function ttsSeekFromWaveform(ev, i){
     }
   }
   ttsJumpTo(i, Math.min(targetIdx, sentences.length-1));
+}
+
+/* ── Normalize SRT cues against the REAL audio duration ──
+   Handles 3 cases automatically for ANY srt file:
+   1. Cues fit within audio → use as-is
+   2. Cues are offset (SRT made for longer recording, audio trimmed) → shift so first cue = 0
+   3. Cues exceed audio entirely → scale proportionally */
+function ttsNormalizeSrtCues(cues, audioDuration){
+  if(!cues || !cues.length || !audioDuration) return cues;
+  const first = cues[0].start;
+  const lastEnd = cues[cues.length-1].end;
+
+  // Case 1: fits — use as-is
+  if(lastEnd <= audioDuration + 0.5){
+    console.log('[TTS] SRT timings fit audio — no normalization needed');
+    return cues;
+  }
+  // Case 2: offset — span fits if we shift so the first cue starts at 0
+  if((lastEnd - first) <= audioDuration + 0.5){
+    console.log('[TTS] SRT offset detected (', first.toFixed(2), 's) — shifting all cues');
+    return cues.map(c => ({
+      start: Math.max(0, c.start - first),
+      end:   Math.max(0, c.end   - first),
+      text:  c.text
+    }));
+  }
+  // Case 3: scale to fit
+  const scale = audioDuration / lastEnd;
+  console.log('[TTS] SRT too long — scaling by', scale.toFixed(3));
+  return cues.map(c => ({ start: c.start*scale, end: c.end*scale, text: c.text }));
+}
+
+const _ttsCuesCache = {};  // normalized cues per item (runtime)
+
+/* Get the effective (normalized) cues for an item */
+function ttsGetCues(item){
+  if(!item || !item.srtCues || !item.srtCues.length) return null;
+  if(_ttsCuesCache[item.id]) return _ttsCuesCache[item.id];
+  // If buffer is decoded, normalize against its duration
+  const buffer = _ttsBufferCache[item.id];
+  if(buffer){
+    const normalized = ttsNormalizeSrtCues(item.srtCues, buffer.duration);
+    _ttsCuesCache[item.id] = normalized;
+    return normalized;
+  }
+  return item.srtCues; // not yet decoded — raw (will normalize after decode)
 }
 
 /* ── Analyze real audio file and render true waveform ── */
@@ -3341,6 +3387,11 @@ async function ttsAnalyzeAudio(i){
     // ★ Cache the decoded buffer — this is what we'll play segments from
     _ttsBufferCache[item.id] = audioBuf;
 
+    // ★ Normalize SRT cues against the REAL audio duration (handles offset SRTs)
+    if(item.srtCues && item.srtCues.length){
+      _ttsCuesCache[item.id] = ttsNormalizeSrtCues(item.srtCues, audioBuf.duration);
+    }
+
     const channelData = audioBuf.getChannelData(0);
     const sampleRate = audioBuf.sampleRate;
     const duration = audioBuf.duration;
@@ -3365,12 +3416,12 @@ async function ttsAnalyzeAudio(i){
     const sentences = ttsGetSentences(item);
     let timings;
     if(item.srtCues && Array.isArray(item.srtCues) && item.srtCues.length > 0){
-      // Use exact SRT start times
-      timings = item.srtCues.map(c => c.start);
+      // Use NORMALIZED cue start times (offset-corrected)
+      const normCues = _ttsCuesCache[item.id] || item.srtCues;
+      timings = normCues.map(c => c.start);
       // Pad/truncate to match sentence count
       while(timings.length < sentences.length){
-        // Last sentence falls between last SRT end and audio end
-        const lastEnd = item.srtCues[item.srtCues.length-1]?.end || duration;
+        const lastEnd = normCues[normCues.length-1]?.end || duration;
         timings.push(Math.min(lastEnd, duration));
       }
       timings = timings.slice(0, sentences.length);
@@ -3810,9 +3861,9 @@ function ttsPlaySentence(i){
 
     // Ensure audio is analyzed and buffer is decoded
     const startPlayback = (buffer) => {
-      // Determine start/end for THIS sentence
+      // Determine start/end for THIS sentence — use NORMALIZED cues (offset-corrected)
       let startSec = 0, endSec = buffer.duration;
-      const srtCues = item.srtCues;
+      const srtCues = ttsGetCues(item);
       if(srtCues && srtCues[si]){
         startSec = Number(srtCues[si].start) || 0;
         endSec   = Number(srtCues[si].end)   || buffer.duration;
@@ -3828,6 +3879,9 @@ function ttsPlaySentence(i){
           endSec   = (si+1) * seg;
         }
       }
+      // Safety clamp to audio bounds
+      startSec = Math.max(0, Math.min(startSec, Math.max(0, buffer.duration - 0.05)));
+      endSec   = Math.max(startSec + 0.05, Math.min(endSec, buffer.duration));
 
       console.log('[TTS] sentence', si+1, '/', sentences.length, '|', startSec.toFixed(2), '→', endSec.toFixed(2));
 
