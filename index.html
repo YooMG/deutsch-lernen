@@ -3703,38 +3703,55 @@ function ttsPlaySentence(i){
 
     ttsIsPaused=false;st.paused=false;
 
+    // Get total sentence count (for fallback math)
+    const allSentences = ttsGetSentences(item);
+
     // Determine start and end times for THIS sentence
     let startTime = 0, endTime = Infinity;
     const srtCues = item.srtCues;
     if(srtCues && srtCues[si]){
       startTime = Number(srtCues[si].start) || 0;
       endTime = Number(srtCues[si].end) || Infinity;
+      console.log('[TTS] using SRT cues:', srtCues[si]);
     } else {
       const timings = _ttsTimingsCache[item.id];
       if(timings && timings[si]!=null){
         startTime = Number(timings[si]) || 0;
         endTime = timings[si+1] != null ? Number(timings[si+1]) : (audio.duration || Infinity);
+        console.log('[TTS] using detected timings');
+      } else if(audio.duration){
+        // Last-resort fallback: divide audio equally per sentence
+        const segmentDur = audio.duration / allSentences.length;
+        startTime = si * segmentDur;
+        endTime = (si + 1) * segmentDur;
+        console.log('[TTS] using equal split fallback');
       }
     }
 
-    console.log('[TTS] play sentence', si+1, 'from', startTime, 'to', endTime, 'srtCues:', !!srtCues, 'item.srtCues length:', srtCues?.length);
+    console.log('[TTS] play sentence', si+1, '/', allSentences.length, 'from', startTime, 'to', endTime, 'srtCues:', !!srtCues, 'item.srtCues length:', srtCues?.length, 'audio.duration:', audio.duration);
 
     // Helper: stop playback at sentence end
     let stopped = false;
+    let rafCheckId = null;
+
     const stopAtEnd = () => {
       if(stopped) return;
       stopped = true;
-      audio.pause();
-      // Clear the polling interval
+      if(rafCheckId){cancelAnimationFrame(rafCheckId);rafCheckId=null;}
       if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
+      audio.pause();
+      // Force currentTime to exact end so it doesn't drift past
+      try{ audio.currentTime = endTime; }catch(e){}
       ttsIsPaused = true;
       st.paused = true;
       ttsUpdateButtons(i,'▶',false);
       ttsShowPostPlay(i);
+      console.log('[TTS] STOPPED at', audio.currentTime, '(target end:', endTime, ')');
     };
 
-    // Clear any prior interval from previous play call
+    // Clear any prior interval/raf from previous play call
     if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
+    if(audio._ttsRafId){cancelAnimationFrame(audio._ttsRafId);audio._ttsRafId=null;}
 
     // Seek to sentence start
     audio.currentTime = startTime;
@@ -3756,11 +3773,25 @@ function ttsPlaySentence(i){
       ttsUpdateButtons(i,'▶',false);
     };
 
-    // Also poll every 60ms (ontimeupdate fires too slowly, ~250ms)
+    // 🔥 requestAnimationFrame loop — checks every frame (~16ms = 60 times/sec)
+    // Far more reliable than ontimeupdate (which fires only ~4 times/sec)
+    const rafCheck = ()=>{
+      if(stopped) return;
+      if(!audio.paused){
+        if(audio.currentTime >= endTime){
+          stopAtEnd();
+          return;
+        }
+      }
+      rafCheckId = requestAnimationFrame(rafCheck);
+    };
+    audio._ttsRafId = requestAnimationFrame(()=>{ rafCheckId = requestAnimationFrame(rafCheck); });
+
+    // Belt-and-suspenders: also a 30ms polling interval
     audio._ttsStopInterval = setInterval(()=>{
       if(stopped){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;return;}
       if(!audio.paused && audio.currentTime >= endTime) stopAtEnd();
-    }, 60);
+    }, 30);
 
     audio.play().then(()=>{
       ttsUpdateButtons(i,'⏸',true);
