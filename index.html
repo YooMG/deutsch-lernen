@@ -3198,6 +3198,7 @@ let ttsIsPaused=false;
 let ttsGermanVoices=[];
 let ttsVolume=1;
 let ttsPrevVolume=1;
+let ttsMuted=false;
 const ttsCardState={};
 
 /* ── Voices ── */
@@ -4290,7 +4291,14 @@ function ttsRafLoop(i){ttsRafId=requestAnimationFrame(()=>{if(ttsIsPaused||ttsCu
 function ttsSetSpeed(i,s,btn){ttsRate=s;btn.closest('.tts-speed-group').querySelectorAll('.tts-speed-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const item=ttsItems[i];if(item){ttsDuration=ttsEstimateDuration(ttsGetSentences(item)[ttsGetState(i).sentIdx]||'',s);const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);}if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
 function ttsSetVoice(i,idx){const sel=document.getElementById('ttsVoiceSel-'+i);if(sel)sel.dataset.vidx=idx;ttsVoiceIdx=parseInt(idx)||0;if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
 function ttsSetVolCard(i,v){ttsVolume=parseFloat(v);const icon=document.getElementById('tts-vol-icon-'+i);if(icon)icon.textContent=ttsVolume===0?'🔇':ttsVolume<0.5?'🔉':'🔊';if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
-function ttsMuteToggle(i){const slider=document.getElementById('tts-vol-'+i);if(!slider)return;if(ttsVolume>0){ttsPrevVolume=ttsVolume;ttsVolume=0;slider.value=0;}else{ttsVolume=ttsPrevVolume||1;slider.value=ttsVolume;}ttsSetVolCard(i,ttsVolume);}
+function ttsMuteToggle(i){
+  const slider=document.getElementById('tts-vol-'+i);if(!slider)return;
+  if(ttsVolume>0){ttsPrevVolume=ttsVolume;ttsVolume=0;ttsMuted=true;slider.value=0;}
+  else{ttsVolume=ttsPrevVolume||1;ttsMuted=false;slider.value=ttsVolume;}
+  ttsSetVolCard(i,ttsVolume);
+  // Apply to all audio elements
+  document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>{a.muted=ttsMuted;a.volume=ttsVolume;});
+}
 
 /* ── Keep-alive (Chrome bug) ── */
 let ttsKeepAliveTimer=null;
@@ -5742,7 +5750,17 @@ window.syncNow = async () => {
 
 // ── TTS Firestore integration ──
 window._ttsFireSave = async (item) => {
-  try { await setDoc(doc(db,'ttsTexts',item.id),item); } catch(e){ console.warn('TTS save:',e); }
+  try {
+    // Firestore field limit is 1MB. Don't save big base64 audio data.
+    // Save only metadata; the file stays in localStorage for the admin user.
+    const safe = {...item};
+    if(safe.audioType === 'file' && safe.audioUrl && safe.audioUrl.length > 900000){
+      // Strip the heavy audio data for Firestore
+      delete safe.audioUrl;
+      safe.audioStoredLocally = true;
+    }
+    await setDoc(doc(db,'ttsTexts',safe.id), safe);
+  } catch(e){ console.warn('TTS save:',e); }
 };
 window._ttsFireDelete = async (id) => {
   try { await deleteDoc(doc(db,'ttsTexts',id)); } catch(e){ console.warn('TTS del:',e); }
