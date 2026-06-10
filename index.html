@@ -3322,6 +3322,56 @@ function ttsNormalizeSrtCues(cues, audioDuration){
   return cues.map(c => ({ start: c.start*scale, end: c.end*scale, text: c.text }));
 }
 
+/* ── Detect actual speech regions in audio (silence-separated) ──
+   If the number of regions equals the number of cues, we get PERFECT
+   alignment: cue k's text ↔ region k's time. No offset guessing. */
+function ttsDetectSpeechRegions(channelData, sampleRate, expectedCount){
+  const winSec = 0.02;
+  const win = Math.floor(sampleRate * winSec);
+  const env = [];
+  for(let i=0; i<channelData.length; i+=win){
+    let s=0, n=0;
+    for(let j=0; j<win && i+j<channelData.length; j++){ s += channelData[i+j]*channelData[i+j]; n++; }
+    env.push(Math.sqrt(s/Math.max(1,n)));
+  }
+  const sorted = env.slice().sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length/2)] || 0.005;
+  const thr = Math.max(0.008, median * 1.5);
+
+  // Build raw speech mask
+  const speech = env.map(v => v > thr);
+
+  // Helper: extract regions merging gaps shorter than minGapSec
+  const extract = (minGapSec) => {
+    const minGapWin = Math.round(minGapSec / winSec);
+    const regions = [];
+    let start = -1, lastSpeech = -1;
+    for(let k=0; k<speech.length; k++){
+      if(speech[k]){
+        if(start < 0) start = k;
+        lastSpeech = k;
+      } else if(start >= 0 && (k - lastSpeech) >= minGapWin){
+        regions.push({start: start*winSec, end: (lastSpeech+1)*winSec});
+        start = -1;
+      }
+    }
+    if(start >= 0) regions.push({start: start*winSec, end: (lastSpeech+1)*winSec});
+    // Drop tiny blips (<0.12s)
+    return regions.filter(r => (r.end - r.start) >= 0.12);
+  };
+
+  // Try several gap thresholds until region count matches cue count
+  for(const gap of [0.35, 0.3, 0.25, 0.4, 0.2, 0.45, 0.15, 0.5, 0.55, 0.6]){
+    const regions = extract(gap);
+    if(regions.length === expectedCount){
+      console.log('[TTS] ★ Perfect region match with gap', gap, 's —', regions.length, 'regions');
+      return regions;
+    }
+  }
+  console.log('[TTS] No exact region match for', expectedCount, 'cues — using offset fallback');
+  return null;
+}
+
 const _ttsCuesCache = {};  // normalized cues per item (runtime)
 
 /* ── Refine cues against the ACTUAL audio signal ──
@@ -3434,13 +3484,24 @@ async function ttsAnalyzeAudio(i){
     const sampleRate = audioBuf.sampleRate;
     const duration = audioBuf.duration;
 
-    // ★ Normalize SRT cues (offset correction) then refine against the actual signal
-    //   (speech-onset alignment + gap-consuming boundaries so no word is cut)
+    // ★ Align SRT cues to the ACTUAL audio:
+    //   1st choice: detect speech regions; if count matches cues → perfect mapping
+    //   2nd choice: offset normalization + onset alignment + gap-consuming boundaries
     if(item.srtCues && item.srtCues.length){
-      let cues = ttsNormalizeSrtCues(item.srtCues, duration);
-      cues = ttsRefineCuesWithAudio(cues, channelData, sampleRate, duration);
-      _ttsCuesCache[item.id] = cues;
-      console.log('[TTS] refined cues:', cues.map(c=>`${c.start.toFixed(2)}→${c.end.toFixed(2)}`).join(' | '));
+      const regions = ttsDetectSpeechRegions(channelData, sampleRate, item.srtCues.length);
+      if(regions){
+        // PERFECT: cue k text ↔ region k time
+        _ttsCuesCache[item.id] = item.srtCues.map((c, k) => ({
+          start: Math.max(0, regions[k].start - 0.10),
+          end:   Math.min(duration, regions[k].end + 0.15),
+          text:  c.text
+        }));
+      } else {
+        let cues = ttsNormalizeSrtCues(item.srtCues, duration);
+        cues = ttsRefineCuesWithAudio(cues, channelData, sampleRate, duration);
+        _ttsCuesCache[item.id] = cues;
+      }
+      console.log('[TTS] final cues:', _ttsCuesCache[item.id].map(c=>`${c.start.toFixed(2)}→${c.end.toFixed(2)}`).join(' | '));
     }
 
     // ── 1. Compute peaks for waveform visualization ──
@@ -3991,10 +4052,10 @@ function ttsShowPostPlay(i){
   const replayBtn=document.getElementById('tts-replay-btn-'+i);
   const nextBtn=document.getElementById('tts-next-btn-'+i);
   const hintReqBtn=document.getElementById('tts-hint-req-btn-'+i);
-  // After playback finishes: show replay & check, NO next button (auto-advance on correct)
+  // After playback finishes: show replay & check & skip-to-next
   if(checkBtn)checkBtn.style.display='';
   if(replayBtn)replayBtn.style.display='flex';
-  if(nextBtn)nextBtn.style.display='none';
+  if(nextBtn)nextBtn.style.display='inline-block';   // manual skip always available
   if(hintReqBtn)hintReqBtn.style.display='';
   // Focus input so user can start typing immediately
   const inp=document.getElementById('tts-input-'+i);
@@ -4287,7 +4348,7 @@ function ttsCheckAnswer(i){
   if(inp){inp.disabled=false;inp.focus();inp.select();}
   if(checkBtn)checkBtn.style.display='';        // keep "تحقق" available
   if(replayBtn)replayBtn.style.display='flex';   // allow replay
-  if(nextBtn)nextBtn.style.display='none';       // DO NOT show next on wrong
+  if(nextBtn)nextBtn.style.display='inline-block'; // allow manual skip
   if(hintReqBtn)hintReqBtn.style.display='';     // hint button available
   if(kbHint)kbHint.textContent='Enter = تحقق · أعد الاستماع 🔁';
 
