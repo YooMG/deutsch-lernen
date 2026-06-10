@@ -3263,33 +3263,66 @@ function ttsGenBars(itemId, audioUrl){
 function ttsSeekFromWaveform(ev, i){
   const item = ttsItems[i];
   if(!item || !item.audioUrl) return;
-  const audio = ttsGetAudioEl(i);
-  if(!audio || !audio.duration) return;
+  const buffer = _ttsBufferCache[item.id];
+  if(!buffer) return;
   const wf = ev.currentTarget;
   const rect = wf.getBoundingClientRect();
   const x = ev.clientX - rect.left;
   const pct = Math.max(0, Math.min(1, x / rect.width));
-  audio.currentTime = pct * audio.duration;
-  ttsUpdateProgress(i, audio.currentTime, audio.duration);
+  const targetTime = pct * buffer.duration;
+
+  // Find which sentence this time belongs to, jump to that sentence
+  const srtCues = item.srtCues;
+  const sentences = ttsGetSentences(item);
+  let targetIdx = 0;
+  if(srtCues && srtCues.length){
+    for(let k=0;k<srtCues.length;k++){
+      if(targetTime >= srtCues[k].start) targetIdx = k;
+      else break;
+    }
+  } else {
+    const timings = _ttsTimingsCache[item.id];
+    if(timings){
+      for(let k=0;k<timings.length;k++){
+        if(targetTime >= timings[k]) targetIdx = k;
+        else break;
+      }
+    }
+  }
+  ttsJumpTo(i, Math.min(targetIdx, sentences.length-1));
 }
 
 /* ── Analyze real audio file and render true waveform ── */
 const _ttsWaveformCache = {};
 const _ttsTimingsCache = {};   // sentence start times per item
+const _ttsBufferCache = {};    // decoded AudioBuffer per item (for precise segment playback)
+let _ttsAudioCtx = null;       // shared AudioContext
+
+function ttsGetAudioCtx(){
+  if(!_ttsAudioCtx){
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return null;
+    _ttsAudioCtx = new AudioCtx();
+  }
+  // Resume if suspended (browser autoplay policy)
+  if(_ttsAudioCtx.state === 'suspended'){
+    _ttsAudioCtx.resume().catch(()=>{});
+  }
+  return _ttsAudioCtx;
+}
 
 async function ttsAnalyzeAudio(i){
   const item = ttsItems[i];
   if(!item || !item.audioUrl) return null;
 
-  // Return cached if available
-  if(_ttsWaveformCache[item.id] && _ttsTimingsCache[item.id]){
-    return { peaks: _ttsWaveformCache[item.id], timings: _ttsTimingsCache[item.id] };
+  // Return cached if available (buffer + peaks + timings all cached)
+  if(_ttsWaveformCache[item.id] && _ttsTimingsCache[item.id] && _ttsBufferCache[item.id]){
+    return { peaks: _ttsWaveformCache[item.id], timings: _ttsTimingsCache[item.id], buffer: _ttsBufferCache[item.id] };
   }
 
   try{
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if(!AudioCtx) return null;
-    const ctx = new AudioCtx();
+    const ctx = ttsGetAudioCtx();
+    if(!ctx) return null;
 
     // Fetch and decode audio
     let arrayBuffer;
@@ -3305,6 +3338,9 @@ async function ttsAnalyzeAudio(i){
     }
 
     const audioBuf = await ctx.decodeAudioData(arrayBuffer);
+    // ★ Cache the decoded buffer — this is what we'll play segments from
+    _ttsBufferCache[item.id] = audioBuf;
+
     const channelData = audioBuf.getChannelData(0);
     const sampleRate = audioBuf.sampleRate;
     const duration = audioBuf.duration;
@@ -3344,8 +3380,8 @@ async function ttsAnalyzeAudio(i){
     }
     _ttsTimingsCache[item.id] = timings;
 
-    try{ ctx.close(); }catch(e){}
-    return { peaks: normalizedPeaks, timings };
+    // Note: do NOT close ctx — it's the shared context used for playback
+    return { peaks: normalizedPeaks, timings, buffer: audioBuf };
   } catch(e){
     console.warn('Audio analysis failed:', e);
     return null;
@@ -3446,10 +3482,9 @@ async function ttsRenderRealWaveform(i){
 
   // Remove old markers, then add sentence boundary markers
   wf.querySelectorAll('.tts-sent-marker').forEach(m=>m.remove());
-  const audio = ttsGetAudioEl(i);
-  const placeMarkers = (dur)=>{
-    if(!dur || !result.timings) return;
-    wf.querySelectorAll('.tts-sent-marker').forEach(m=>m.remove());
+  // Use decoded buffer duration (always available after analyze)
+  const dur = result.buffer?.duration || _ttsBufferCache[item.id]?.duration;
+  if(dur && result.timings){
     result.timings.forEach((t, idx) => {
       if(idx === 0) return;
       const pct = (t / dur) * 100;
@@ -3459,11 +3494,6 @@ async function ttsRenderRealWaveform(i){
       marker.style.left = pct + '%';
       wf.appendChild(marker);
     });
-  };
-  if(audio?.duration){
-    placeMarkers(audio.duration);
-  } else if(audio){
-    audio.addEventListener('loadedmetadata', ()=>placeMarkers(audio.duration), {once:true});
   }
 }
 
@@ -3591,6 +3621,10 @@ function ttsShowTab(i,tab,btn){
 
 /* ── Card open ── */
 function ttsOpenCard(i){
+  // User gesture — unlock/resume the AudioContext (browser autoplay policy)
+  const _ctx = ttsGetAudioCtx();
+  if(_ctx && _ctx.state === 'suspended'){ _ctx.resume().catch(()=>{}); }
+
   if(ttsCurrent>=0&&ttsCurrent!==i)ttsStopCurrent();
   if(ttsCurrent===i){if(ttsIsPaused)ttsResume(i);else ttsPause(i);return;}
   ttsCurrent=i;
@@ -3601,7 +3635,7 @@ function ttsOpenCard(i){
 
   const item=ttsItems[i];
   if(item&&item.audioUrl){
-    // Analyze audio FIRST (waveform + sentence timings), then start playback
+    // Analyze audio FIRST (decodes buffer + waveform + sentence timings), then start playback
     ttsAnalyzeAudio(i).then(()=>{
       ttsRenderRealWaveform(i);
       ttsPlaySentence(i);
@@ -3686,6 +3720,81 @@ function ttsGetAudioEl(i){
   return el;
 }
 
+/* ── Web Audio segment player — sample-accurate, guaranteed stop ── */
+let _ttsActiveSource = null;   // current AudioBufferSourceNode
+let _ttsGainNode = null;
+let _ttsSegStartCtx = 0;       // ctx.currentTime when segment started
+let _ttsSegStartOffset = 0;    // offset into buffer where segment starts
+let _ttsSegEndOffset = 0;      // offset into buffer where segment ends
+let _ttsSegPausedAt = 0;       // buffer-offset when paused
+let _ttsProgressRaf = null;
+
+function ttsStopSegment(){
+  if(_ttsActiveSource){
+    try{ _ttsActiveSource.onended = null; _ttsActiveSource.stop(); }catch(e){}
+    _ttsActiveSource = null;
+  }
+  if(_ttsProgressRaf){ cancelAnimationFrame(_ttsProgressRaf); _ttsProgressRaf = null; }
+}
+
+/* Play one sentence segment [startSec, endSec] from the decoded buffer.
+   The browser stops it EXACTLY at endSec — guaranteed by source.start(when, offset, duration). */
+function ttsPlaySegment(i, buffer, startSec, endSec, onDone){
+  const ctx = ttsGetAudioCtx();
+  if(!ctx || !buffer) return false;
+
+  // Stop any previous segment
+  ttsStopSegment();
+
+  // Gain node for volume control
+  if(!_ttsGainNode){
+    _ttsGainNode = ctx.createGain();
+    _ttsGainNode.connect(ctx.destination);
+  }
+  _ttsGainNode.gain.value = ttsMuted ? 0 : Math.max(0, Math.min(1, ttsVolume));
+
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = Math.max(0.5, Math.min(2, ttsRate));
+  source.connect(_ttsGainNode);
+
+  const segDuration = Math.max(0.05, endSec - startSec);
+
+  _ttsActiveSource = source;
+  _ttsSegStartCtx = ctx.currentTime;
+  _ttsSegStartOffset = startSec;
+  _ttsSegEndOffset = endSec;
+
+  source.onended = () => {
+    if(_ttsActiveSource === source){
+      _ttsActiveSource = null;
+      if(_ttsProgressRaf){ cancelAnimationFrame(_ttsProgressRaf); _ttsProgressRaf = null; }
+      if(typeof onDone === 'function') onDone();
+    }
+  };
+
+  // ★ THE KEY: start(when=now, offset=startSec, duration=segDuration)
+  // The Web Audio engine stops playback after exactly segDuration seconds.
+  source.start(0, startSec, segDuration / source.playbackRate.value * source.playbackRate.value);
+  // Note: duration param is in buffer-time, playbackRate scales wall-clock automatically
+
+  console.log('[TTS] ► segment', startSec.toFixed(2), '→', endSec.toFixed(2), '(', segDuration.toFixed(2), 's )');
+
+  // Progress UI updater
+  const totalDur = buffer.duration;
+  const tick = () => {
+    if(!_ttsActiveSource) return;
+    const elapsed = (ctx.currentTime - _ttsSegStartCtx) * source.playbackRate.value;
+    const pos = Math.min(_ttsSegStartOffset + elapsed, _ttsSegEndOffset);
+    ttsElapsed = pos;
+    ttsUpdateProgress(i, pos, totalDur);
+    _ttsProgressRaf = requestAnimationFrame(tick);
+  };
+  _ttsProgressRaf = requestAnimationFrame(tick);
+
+  return true;
+}
+
 function ttsPlaySentence(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
   const sentences=ttsGetSentences(item);const si=st.sentIdx;if(si>=sentences.length)return;
@@ -3695,56 +3804,66 @@ function ttsPlaySentence(i){
   window.speechSynthesis.cancel();
   if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
 
-  // ── External audio path (file/url) ──
+  // ── External audio path (file/url) — Web Audio sample-accurate playback ──
   if(item.audioUrl){
-    const audio=ttsGetAudioEl(i);
-    if(!audio){return;}
-    // Stop any other audio
-    document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>{if(a!==audio){a.pause();a.currentTime=0;}});
-    audio.playbackRate=Math.max(0.5,Math.min(2,ttsRate));
-    audio.volume=Math.max(0,Math.min(1,ttsVolume));
-    audio.muted=ttsMuted;
-
     ttsIsPaused=false;st.paused=false;
 
-    // CRITICAL: Wait for audio to be ready (duration loaded)
-    const ensureReady = () => {
-      return new Promise((resolve)=>{
-        if(!isNaN(audio.duration) && audio.duration > 0){
-          resolve();
-          return;
+    // Ensure audio is analyzed and buffer is decoded
+    const startPlayback = (buffer) => {
+      // Determine start/end for THIS sentence
+      let startSec = 0, endSec = buffer.duration;
+      const srtCues = item.srtCues;
+      if(srtCues && srtCues[si]){
+        startSec = Number(srtCues[si].start) || 0;
+        endSec   = Number(srtCues[si].end)   || buffer.duration;
+      } else {
+        const timings = _ttsTimingsCache[item.id];
+        if(timings && timings[si]!=null){
+          startSec = Number(timings[si]) || 0;
+          endSec   = timings[si+1]!=null ? Number(timings[si+1]) : buffer.duration;
+        } else {
+          // equal split fallback
+          const seg = buffer.duration / sentences.length;
+          startSec = si * seg;
+          endSec   = (si+1) * seg;
         }
-        let done = false;
-        const finish = () => { if(done)return; done=true; resolve(); };
-        // Multiple events to catch readiness
-        ['loadedmetadata','canplay','canplaythrough','durationchange'].forEach(evt=>{
-          audio.addEventListener(evt, ()=>{
-            if(!isNaN(audio.duration) && audio.duration > 0) finish();
-          }, {once:true});
-        });
-        // Poll as backup (in case events were missed)
-        const poll = setInterval(()=>{
-          if(!isNaN(audio.duration) && audio.duration > 0){
-            clearInterval(poll);
-            finish();
-          }
-        }, 80);
-        // Hard timeout fallback
-        setTimeout(()=>{ clearInterval(poll); finish(); }, 5000);
-        // Force load
-        try{ audio.load(); }catch(e){ console.warn('audio.load failed', e); }
+      }
+
+      console.log('[TTS] sentence', si+1, '/', sentences.length, '|', startSec.toFixed(2), '→', endSec.toFixed(2));
+
+      // Update duration display (total audio duration)
+      ttsDuration = buffer.duration;
+      const durEl = document.getElementById('tts-dur-'+i);
+      if(durEl) durEl.textContent = ttsFormatTime(buffer.duration);
+
+      const ok = ttsPlaySegment(i, buffer, startSec, endSec, () => {
+        // Segment finished — browser stopped it exactly at endSec
+        ttsIsPaused = true;
+        st.paused = true;
+        ttsUpdateButtons(i,'▶',false);
+        ttsUpdateProgress(i, endSec, buffer.duration);
+        ttsShowPostPlay(i);
+        console.log('[TTS] ■ segment ended at', endSec.toFixed(2));
       });
+
+      if(ok) ttsUpdateButtons(i,'⏸',true);
     };
 
-    ensureReady().then(() => {
-      console.log('[TTS] audio ready. duration =', audio.duration);
-      if(isNaN(audio.duration) || audio.duration <= 0){
-        console.error('[TTS] CRITICAL: audio.duration still NaN after wait. The audio file failed to load.');
-        ttsUpdateButtons(i,'▶',false);
-        return;
-      }
-      ttsStartAudioPlayback(i, audio, st);
-    });
+    const cachedBuffer = _ttsBufferCache[item.id];
+    if(cachedBuffer){
+      startPlayback(cachedBuffer);
+    } else {
+      // Decode first (also builds waveform + timings)
+      ttsAnalyzeAudio(i).then(result => {
+        if(result && result.buffer){
+          ttsRenderRealWaveform(i);
+          startPlayback(result.buffer);
+        } else {
+          console.error('[TTS] Failed to decode audio');
+          ttsUpdateButtons(i,'▶',false);
+        }
+      });
+    }
     return;
   }
 
@@ -3762,109 +3881,6 @@ function ttsPlaySentence(i){
   u.onerror=(e)=>{if(e.error==='interrupted')return;if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}ttsUpdateButtons(i,'▶',false);};
   window.speechSynthesis.speak(u);ttsUpdateButtons(i,'⏸',true);
   const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
-}
-
-/* Actually start audio playback once the audio element is ready */
-function ttsStartAudioPlayback(i, audio, st){
-  const item = ttsItems[i];
-  if(!item) return;
-  const allSentences = ttsGetSentences(item);
-  const si = st.sentIdx;
-
-  // Determine start and end times for THIS sentence
-  let startTime = 0, endTime = Infinity;
-  const srtCues = item.srtCues;
-  if(srtCues && srtCues[si]){
-    startTime = Number(srtCues[si].start) || 0;
-    endTime = Number(srtCues[si].end) || Infinity;
-    console.log('[TTS] using SRT cues:', srtCues[si]);
-  } else {
-    const timings = _ttsTimingsCache[item.id];
-    if(timings && timings[si]!=null){
-      startTime = Number(timings[si]) || 0;
-      endTime = timings[si+1] != null ? Number(timings[si+1]) : (audio.duration || Infinity);
-      console.log('[TTS] using detected timings');
-    } else if(audio.duration && !isNaN(audio.duration)){
-      const segmentDur = audio.duration / allSentences.length;
-      startTime = si * segmentDur;
-      endTime = (si + 1) * segmentDur;
-      console.log('[TTS] using equal split fallback');
-    }
-  }
-
-  console.log('[TTS] play sentence', si+1, '/', allSentences.length,
-              'from', startTime, 'to', endTime,
-              'audio.duration:', audio.duration);
-
-  // Sanity check: if endTime is Infinity, we can't stop properly
-  if(endTime === Infinity || isNaN(endTime)){
-    console.warn('[TTS] No valid endTime — falling back to full audio playback');
-    endTime = audio.duration || 9999;
-  }
-
-  // Update duration display
-  ttsDuration = audio.duration || 0;
-  const durEl = document.getElementById('tts-dur-'+i);
-  if(durEl) durEl.textContent = ttsFormatTime(ttsDuration);
-
-  // Clear any prior interval/raf from previous play call
-  if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
-  if(audio._ttsRafId){cancelAnimationFrame(audio._ttsRafId);audio._ttsRafId=null;}
-
-  // Seek to sentence start
-  try{ audio.currentTime = startTime; }catch(e){ console.warn('seek failed', e); }
-
-  // Stop handler
-  let stopped = false;
-  const stopAtEnd = () => {
-    if(stopped) return;
-    stopped = true;
-    if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
-    if(audio._ttsRafId){cancelAnimationFrame(audio._ttsRafId);audio._ttsRafId=null;}
-    audio.pause();
-    try{ audio.currentTime = endTime; }catch(e){}
-    ttsIsPaused = true;
-    st.paused = true;
-    ttsUpdateButtons(i,'▶',false);
-    ttsShowPostPlay(i);
-    console.log('[TTS] STOPPED at', audio.currentTime.toFixed(3), '(target:', endTime.toFixed(3), ')');
-  };
-
-  audio.ontimeupdate = () => {
-    if(stopped) return;
-    ttsElapsed = audio.currentTime;
-    ttsUpdateProgress(i, audio.currentTime, audio.duration || 0);
-    if(audio.currentTime >= endTime) stopAtEnd();
-  };
-  audio.onended = () => stopAtEnd();
-  audio.onerror = () => {
-    console.warn('Audio error');
-    ttsUpdateButtons(i,'▶',false);
-  };
-
-  // requestAnimationFrame loop for precise stopping (60fps)
-  const rafCheck = () => {
-    if(stopped) return;
-    if(!audio.paused && audio.currentTime >= endTime){
-      stopAtEnd();
-      return;
-    }
-    audio._ttsRafId = requestAnimationFrame(rafCheck);
-  };
-  audio._ttsRafId = requestAnimationFrame(rafCheck);
-
-  // Polling interval (belt + suspenders)
-  audio._ttsStopInterval = setInterval(() => {
-    if(stopped){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;return;}
-    if(!audio.paused && audio.currentTime >= endTime) stopAtEnd();
-  }, 30);
-
-  audio.play().then(() => {
-    ttsUpdateButtons(i,'⏸',true);
-  }).catch(e => {
-    console.warn('Audio play blocked:', e);
-    ttsUpdateButtons(i,'▶',false);
-  });
 }
 
 /* ── Show replay+next after sentence ends ── */
@@ -3889,18 +3905,9 @@ function ttsSentReplay(i){
   if(ttsCurrent!==i)return;
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
 
-  // If external audio, seek to current sentence start (NOT audio start)
+  // External audio: just replay the current sentence segment
   if(item.audioUrl){
-    const audio=ttsGetAudioEl(i);
-    const timings=_ttsTimingsCache[item.id];
-    if(audio){
-      if(timings && timings[st.sentIdx]!=null){
-        audio.currentTime=timings[st.sentIdx];
-      } else {
-        audio.currentTime=0;
-      }
-      ttsPlaySentence(i);
-    }
+    ttsPlaySentence(i);  // ttsPlaySentence stops old segment and plays fresh from sentence start
     return;
   }
 
@@ -3925,8 +3932,15 @@ function ttsSentToggle(i){if(ttsCurrent!==i){ttsOpenCard(i);return;}if(ttsIsPaus
 function ttsPause(i){
   const item=ttsItems[i];
   if(item&&item.audioUrl){
-    const audio=ttsGetAudioEl(i);
-    if(audio){audio.pause();ttsIsPaused=true;const st=ttsGetState(i);st.paused=true;ttsUpdateButtons(i,'▶',false);}
+    // Web Audio: record where we are, stop the source
+    const ctx = ttsGetAudioCtx();
+    if(_ttsActiveSource && ctx){
+      const elapsed = (ctx.currentTime - _ttsSegStartCtx) * (_ttsActiveSource.playbackRate?.value || 1);
+      _ttsSegPausedAt = Math.min(_ttsSegStartOffset + elapsed, _ttsSegEndOffset);
+    }
+    ttsStopSegment();
+    ttsIsPaused=true;const st=ttsGetState(i);st.paused=true;
+    ttsUpdateButtons(i,'▶',false);
     return;
   }
   // Legacy TTS pause
@@ -3942,8 +3956,25 @@ function ttsResume(i){
   if(!ttsIsPaused)return;
   const item=ttsItems[i];
   if(item&&item.audioUrl){
-    const audio=ttsGetAudioEl(i);
-    if(audio){audio.play().catch(()=>{});ttsIsPaused=false;const st=ttsGetState(i);st.paused=false;ttsUpdateButtons(i,'⏸',true);}
+    // Web Audio: resume from paused position to sentence end
+    const buffer = _ttsBufferCache[item.id];
+    const st = ttsGetState(i);
+    if(buffer && _ttsSegPausedAt > 0 && _ttsSegPausedAt < _ttsSegEndOffset - 0.05){
+      ttsIsPaused=false;st.paused=false;
+      const endSec = _ttsSegEndOffset;
+      ttsPlaySegment(i, buffer, _ttsSegPausedAt, endSec, () => {
+        ttsIsPaused = true; st.paused = true;
+        ttsUpdateButtons(i,'▶',false);
+        ttsUpdateProgress(i, endSec, buffer.duration);
+        ttsShowPostPlay(i);
+      });
+      ttsUpdateButtons(i,'⏸',true);
+      _ttsSegPausedAt = 0;
+    } else {
+      // No valid pause point — replay current sentence
+      ttsIsPaused=false;st.paused=false;
+      ttsPlaySentence(i);
+    }
     return;
   }
   ttsIsPaused=false;const st=ttsGetState(i);st.paused=false;ttsPausedAt=0;
@@ -3952,7 +3983,8 @@ function ttsResume(i){
 
 function ttsStopCurrent(){
   window.speechSynthesis.cancel();
-  // Stop all audio elements too
+  // Stop Web Audio segment + any legacy audio elements
+  ttsStopSegment();
   document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>{a.pause();a.currentTime=0;});
   if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
   if(ttsKeepAliveTimer){clearInterval(ttsKeepAliveTimer);ttsKeepAliveTimer=null;}
@@ -3961,7 +3993,7 @@ function ttsStopCurrent(){
     const oc=document.getElementById('tts-card-'+ttsCurrent);if(oc)oc.classList.remove('tts-playing');
     ttsUpdateButtons(ttsCurrent,'▶',false);
   }
-  ttsCurrent=-1;ttsPausedAt=0;ttsIsPaused=false;ttsElapsed=0;
+  ttsCurrent=-1;ttsPausedAt=0;ttsIsPaused=false;ttsElapsed=0;_ttsSegPausedAt=0;
 }
 
 /* ── Next sentence ── */
@@ -3969,33 +4001,16 @@ function ttsSentNext(i){
   const st=ttsGetState(i);const item=ttsItems[i];if(!item)return;
   const sentences=ttsGetSentences(item);st.sentIdx++;
   if(st.sentIdx>=sentences.length){ttsShowComplete(i);return;}
-
-  // For external audio, seek to the next sentence's start time
-  if(item.audioUrl){
-    const audio=ttsGetAudioEl(i);
-    const timings=_ttsTimingsCache[item.id];
-    if(audio && timings && timings[st.sentIdx]!=null){
-      audio.currentTime=timings[st.sentIdx];
-    }
-  }
-
+  _ttsSegPausedAt=0;
   ttsRenderDictationState(i);
-  ttsPlaySentence(i);
+  ttsPlaySentence(i);  // plays the new sentence's segment from its SRT start
 }
 function ttsJumpTo(i,si){
   if(ttsCurrent!==i){ttsOpenCard(i);return;}
   const st=ttsGetState(i);st.sentIdx=si;
-  const item=ttsItems[i];
-  // For external audio: seek to that sentence's timing
-  if(item && item.audioUrl){
-    const audio=ttsGetAudioEl(i);
-    const timings=_ttsTimingsCache[item.id];
-    if(audio && timings && timings[si]!=null){
-      audio.currentTime=timings[si];
-    }
-  }
+  _ttsSegPausedAt=0;
   ttsRenderDictationState(i);
-  ttsPlaySentence(i);
+  ttsPlaySentence(i);  // segment timing handled inside
 }
 function ttsShowComplete(i){
   const st=ttsGetState(i);const sentences=ttsGetSentences(ttsItems[i]);
@@ -4113,6 +4128,7 @@ function ttsCheckAnswer(i){
 
   // Stop audio whenever user submits
   window.speechSynthesis.cancel();
+  ttsStopSegment();
   document.querySelectorAll('audio[id^="tts-audio-"]').forEach(a=>a.pause());
   if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
   ttsUpdateButtons(i,'▶',false);
@@ -4336,9 +4352,38 @@ function ttsUpdateProgress(i,elapsed,duration){
 function ttsRafLoop(i){ttsRafId=requestAnimationFrame(()=>{if(ttsIsPaused||ttsCurrent!==i)return;ttsElapsed=(performance.now()-ttsStartTime)/1000;ttsUpdateProgress(i,Math.min(ttsElapsed,ttsDuration),ttsDuration);if(ttsElapsed<ttsDuration+1)ttsRafLoop(i);});}
 
 /* ── Speed / Voice / Volume ── */
-function ttsSetSpeed(i,s,btn){ttsRate=s;btn.closest('.tts-speed-group').querySelectorAll('.tts-speed-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const item=ttsItems[i];if(item){ttsDuration=ttsEstimateDuration(ttsGetSentences(item)[ttsGetState(i).sentIdx]||'',s);const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);}if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
+function ttsSetSpeed(i,s,btn){
+  ttsRate=s;
+  btn.closest('.tts-speed-group').querySelectorAll('.tts-speed-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // Apply live to active Web Audio segment
+  if(_ttsActiveSource && _ttsActiveSource.playbackRate){
+    _ttsActiveSource.playbackRate.value = Math.max(0.5,Math.min(2,s));
+  }
+  const item=ttsItems[i];
+  if(item && !item.audioUrl){
+    ttsDuration=ttsEstimateDuration(ttsGetSentences(item)[ttsGetState(i).sentIdx]||'',s);
+    const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
+    if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);
+  }
+}
+
+function ttsSetVolCard(i,v){
+  ttsVolume=parseFloat(v);
+  ttsMuted=(ttsVolume===0);
+  const icon=document.getElementById('tts-vol-icon-'+i);
+  if(icon)icon.textContent=ttsVolume===0?'🔇':ttsVolume<0.5?'🔉':'🔊';
+  // Apply live to Web Audio gain
+  if(_ttsGainNode){
+    _ttsGainNode.gain.value = ttsMuted ? 0 : ttsVolume;
+  }
+  // Legacy TTS needs restart to change volume
+  const item=ttsItems[i];
+  if(item && !item.audioUrl && ttsCurrent===i && !ttsIsPaused)ttsPlaySentence(i);
+}
 function ttsSetVoice(i,idx){const sel=document.getElementById('ttsVoiceSel-'+i);if(sel)sel.dataset.vidx=idx;ttsVoiceIdx=parseInt(idx)||0;if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
-function ttsSetVolCard(i,v){ttsVolume=parseFloat(v);const icon=document.getElementById('tts-vol-icon-'+i);if(icon)icon.textContent=ttsVolume===0?'🔇':ttsVolume<0.5?'🔉':'🔊';if(ttsCurrent===i&&!ttsIsPaused)ttsPlaySentence(i);}
+
+
 function ttsMuteToggle(i){
   const slider=document.getElementById('tts-vol-'+i);if(!slider)return;
   if(ttsVolume>0){ttsPrevVolume=ttsVolume;ttsVolume=0;ttsMuted=true;slider.value=0;}
