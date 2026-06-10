@@ -3675,10 +3675,13 @@ function ttsGetAudioEl(i){
     const item=ttsItems[i];if(!item||!item.audioUrl)return null;
     el=document.createElement('audio');
     el.id='tts-audio-'+i;
+    el.preload='auto';   // ← Force full preload so duration is available
+    el.crossOrigin='anonymous';
     el.src=item.audioUrl;
-    el.preload='metadata';
     el.style.display='none';
     document.body.appendChild(el);
+    // Force load to start
+    try{ el.load(); }catch(e){}
   }
   return el;
 }
@@ -3704,101 +3707,43 @@ function ttsPlaySentence(i){
 
     ttsIsPaused=false;st.paused=false;
 
-    // Get total sentence count (for fallback math)
-    const allSentences = ttsGetSentences(item);
-
-    // Determine start and end times for THIS sentence
-    let startTime = 0, endTime = Infinity;
-    const srtCues = item.srtCues;
-    if(srtCues && srtCues[si]){
-      startTime = Number(srtCues[si].start) || 0;
-      endTime = Number(srtCues[si].end) || Infinity;
-      console.log('[TTS] using SRT cues:', srtCues[si]);
-    } else {
-      const timings = _ttsTimingsCache[item.id];
-      if(timings && timings[si]!=null){
-        startTime = Number(timings[si]) || 0;
-        endTime = timings[si+1] != null ? Number(timings[si+1]) : (audio.duration || Infinity);
-        console.log('[TTS] using detected timings');
-      } else if(audio.duration){
-        // Last-resort fallback: divide audio equally per sentence
-        const segmentDur = audio.duration / allSentences.length;
-        startTime = si * segmentDur;
-        endTime = (si + 1) * segmentDur;
-        console.log('[TTS] using equal split fallback');
-      }
-    }
-
-    console.log('[TTS] play sentence', si+1, '/', allSentences.length, 'from', startTime, 'to', endTime, 'srtCues:', !!srtCues, 'item.srtCues length:', srtCues?.length, 'audio.duration:', audio.duration);
-
-    // Helper: stop playback at sentence end
-    let stopped = false;
-    let rafCheckId = null;
-
-    const stopAtEnd = () => {
-      if(stopped) return;
-      stopped = true;
-      if(rafCheckId){cancelAnimationFrame(rafCheckId);rafCheckId=null;}
-      if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
-      audio.pause();
-      // Force currentTime to exact end so it doesn't drift past
-      try{ audio.currentTime = endTime; }catch(e){}
-      ttsIsPaused = true;
-      st.paused = true;
-      ttsUpdateButtons(i,'▶',false);
-      ttsShowPostPlay(i);
-      console.log('[TTS] STOPPED at', audio.currentTime, '(target end:', endTime, ')');
-    };
-
-    // Clear any prior interval/raf from previous play call
-    if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
-    if(audio._ttsRafId){cancelAnimationFrame(audio._ttsRafId);audio._ttsRafId=null;}
-
-    // Seek to sentence start
-    audio.currentTime = startTime;
-
-    audio.onloadedmetadata=()=>{
-      ttsDuration=audio.duration||0;
-      const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
-    };
-
-    audio.ontimeupdate=()=>{
-      if(stopped)return;
-      ttsElapsed=audio.currentTime;
-      ttsUpdateProgress(i,audio.currentTime,audio.duration||0);
-      if(audio.currentTime >= endTime) stopAtEnd();
-    };
-    audio.onended=()=>stopAtEnd();
-    audio.onerror=()=>{
-      console.warn('Audio load error');
-      ttsUpdateButtons(i,'▶',false);
-    };
-
-    // 🔥 requestAnimationFrame loop — checks every frame (~16ms = 60 times/sec)
-    // Far more reliable than ontimeupdate (which fires only ~4 times/sec)
-    const rafCheck = ()=>{
-      if(stopped) return;
-      if(!audio.paused){
-        if(audio.currentTime >= endTime){
-          stopAtEnd();
+    // CRITICAL: Wait for audio to be ready (duration loaded)
+    const ensureReady = () => {
+      return new Promise((resolve)=>{
+        if(!isNaN(audio.duration) && audio.duration > 0){
+          resolve();
           return;
         }
-      }
-      rafCheckId = requestAnimationFrame(rafCheck);
+        let done = false;
+        const finish = () => { if(done)return; done=true; resolve(); };
+        // Multiple events to catch readiness
+        ['loadedmetadata','canplay','canplaythrough','durationchange'].forEach(evt=>{
+          audio.addEventListener(evt, ()=>{
+            if(!isNaN(audio.duration) && audio.duration > 0) finish();
+          }, {once:true});
+        });
+        // Poll as backup (in case events were missed)
+        const poll = setInterval(()=>{
+          if(!isNaN(audio.duration) && audio.duration > 0){
+            clearInterval(poll);
+            finish();
+          }
+        }, 80);
+        // Hard timeout fallback
+        setTimeout(()=>{ clearInterval(poll); finish(); }, 5000);
+        // Force load
+        try{ audio.load(); }catch(e){ console.warn('audio.load failed', e); }
+      });
     };
-    audio._ttsRafId = requestAnimationFrame(()=>{ rafCheckId = requestAnimationFrame(rafCheck); });
 
-    // Belt-and-suspenders: also a 30ms polling interval
-    audio._ttsStopInterval = setInterval(()=>{
-      if(stopped){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;return;}
-      if(!audio.paused && audio.currentTime >= endTime) stopAtEnd();
-    }, 30);
-
-    audio.play().then(()=>{
-      ttsUpdateButtons(i,'⏸',true);
-    }).catch(e=>{
-      console.warn('Audio play blocked:',e);
-      ttsUpdateButtons(i,'▶',false);
+    ensureReady().then(() => {
+      console.log('[TTS] audio ready. duration =', audio.duration);
+      if(isNaN(audio.duration) || audio.duration <= 0){
+        console.error('[TTS] CRITICAL: audio.duration still NaN after wait. The audio file failed to load.');
+        ttsUpdateButtons(i,'▶',false);
+        return;
+      }
+      ttsStartAudioPlayback(i, audio, st);
     });
     return;
   }
@@ -3817,6 +3762,109 @@ function ttsPlaySentence(i){
   u.onerror=(e)=>{if(e.error==='interrupted')return;if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}ttsUpdateButtons(i,'▶',false);};
   window.speechSynthesis.speak(u);ttsUpdateButtons(i,'⏸',true);
   const durEl=document.getElementById('tts-dur-'+i);if(durEl)durEl.textContent=ttsFormatTime(ttsDuration);
+}
+
+/* Actually start audio playback once the audio element is ready */
+function ttsStartAudioPlayback(i, audio, st){
+  const item = ttsItems[i];
+  if(!item) return;
+  const allSentences = ttsGetSentences(item);
+  const si = st.sentIdx;
+
+  // Determine start and end times for THIS sentence
+  let startTime = 0, endTime = Infinity;
+  const srtCues = item.srtCues;
+  if(srtCues && srtCues[si]){
+    startTime = Number(srtCues[si].start) || 0;
+    endTime = Number(srtCues[si].end) || Infinity;
+    console.log('[TTS] using SRT cues:', srtCues[si]);
+  } else {
+    const timings = _ttsTimingsCache[item.id];
+    if(timings && timings[si]!=null){
+      startTime = Number(timings[si]) || 0;
+      endTime = timings[si+1] != null ? Number(timings[si+1]) : (audio.duration || Infinity);
+      console.log('[TTS] using detected timings');
+    } else if(audio.duration && !isNaN(audio.duration)){
+      const segmentDur = audio.duration / allSentences.length;
+      startTime = si * segmentDur;
+      endTime = (si + 1) * segmentDur;
+      console.log('[TTS] using equal split fallback');
+    }
+  }
+
+  console.log('[TTS] play sentence', si+1, '/', allSentences.length,
+              'from', startTime, 'to', endTime,
+              'audio.duration:', audio.duration);
+
+  // Sanity check: if endTime is Infinity, we can't stop properly
+  if(endTime === Infinity || isNaN(endTime)){
+    console.warn('[TTS] No valid endTime — falling back to full audio playback');
+    endTime = audio.duration || 9999;
+  }
+
+  // Update duration display
+  ttsDuration = audio.duration || 0;
+  const durEl = document.getElementById('tts-dur-'+i);
+  if(durEl) durEl.textContent = ttsFormatTime(ttsDuration);
+
+  // Clear any prior interval/raf from previous play call
+  if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
+  if(audio._ttsRafId){cancelAnimationFrame(audio._ttsRafId);audio._ttsRafId=null;}
+
+  // Seek to sentence start
+  try{ audio.currentTime = startTime; }catch(e){ console.warn('seek failed', e); }
+
+  // Stop handler
+  let stopped = false;
+  const stopAtEnd = () => {
+    if(stopped) return;
+    stopped = true;
+    if(audio._ttsStopInterval){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;}
+    if(audio._ttsRafId){cancelAnimationFrame(audio._ttsRafId);audio._ttsRafId=null;}
+    audio.pause();
+    try{ audio.currentTime = endTime; }catch(e){}
+    ttsIsPaused = true;
+    st.paused = true;
+    ttsUpdateButtons(i,'▶',false);
+    ttsShowPostPlay(i);
+    console.log('[TTS] STOPPED at', audio.currentTime.toFixed(3), '(target:', endTime.toFixed(3), ')');
+  };
+
+  audio.ontimeupdate = () => {
+    if(stopped) return;
+    ttsElapsed = audio.currentTime;
+    ttsUpdateProgress(i, audio.currentTime, audio.duration || 0);
+    if(audio.currentTime >= endTime) stopAtEnd();
+  };
+  audio.onended = () => stopAtEnd();
+  audio.onerror = () => {
+    console.warn('Audio error');
+    ttsUpdateButtons(i,'▶',false);
+  };
+
+  // requestAnimationFrame loop for precise stopping (60fps)
+  const rafCheck = () => {
+    if(stopped) return;
+    if(!audio.paused && audio.currentTime >= endTime){
+      stopAtEnd();
+      return;
+    }
+    audio._ttsRafId = requestAnimationFrame(rafCheck);
+  };
+  audio._ttsRafId = requestAnimationFrame(rafCheck);
+
+  // Polling interval (belt + suspenders)
+  audio._ttsStopInterval = setInterval(() => {
+    if(stopped){clearInterval(audio._ttsStopInterval);audio._ttsStopInterval=null;return;}
+    if(!audio.paused && audio.currentTime >= endTime) stopAtEnd();
+  }, 30);
+
+  audio.play().then(() => {
+    ttsUpdateButtons(i,'⏸',true);
+  }).catch(e => {
+    console.warn('Audio play blocked:', e);
+    ttsUpdateButtons(i,'▶',false);
+  });
 }
 
 /* ── Show replay+next after sentence ends ── */
