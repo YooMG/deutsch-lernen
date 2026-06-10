@@ -3324,6 +3324,49 @@ function ttsNormalizeSrtCues(cues, audioDuration){
 
 const _ttsCuesCache = {};  // normalized cues per item (runtime)
 
+/* ── Refine cues against the ACTUAL audio signal ──
+   1. Detect real speech onset and align first cue to it
+   2. Start each segment slightly earlier (-0.15s) so no word start is cut
+   3. Extend each segment's end into the silence gap before the next cue
+      so no word end is cut. */
+function ttsRefineCuesWithAudio(cues, channelData, sampleRate, duration){
+  if(!cues || !cues.length) return cues;
+
+  // 1. Find speech onset via RMS envelope
+  const win = Math.floor(sampleRate * 0.02); // 20ms windows
+  const env = [];
+  for(let i=0; i<channelData.length; i+=win){
+    let s=0, n=0;
+    for(let j=0; j<win && i+j<channelData.length; j++){ s += channelData[i+j]*channelData[i+j]; n++; }
+    env.push(Math.sqrt(s/Math.max(1,n)));
+  }
+  const sorted = env.slice().sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length/2)] || 0.005;
+  const thr = Math.max(0.008, median * 1.5);
+  const onsetIdx = env.findIndex(v => v > thr);
+  const onset = onsetIdx > 0 ? onsetIdx * 0.02 : 0;
+
+  // 2. Shift all cues so the first cue aligns with real speech onset
+  const shift = onset - cues[0].start;
+  const shifted = cues.map(c => ({ start: c.start + shift, end: c.end + shift, text: c.text }));
+  if(Math.abs(shift) > 0.01) console.log('[TTS] aligned cues to speech onset:', onset.toFixed(2), 's (shift', shift.toFixed(2), 's)');
+
+  // 3. Expand boundaries — ends first (into gaps), then starts
+  const newEnds = shifted.map((c, k) => {
+    const nextStart = k < shifted.length-1 ? shifted[k+1].start : duration;
+    // Extend end up to 0.35s OR until just before next cue — whichever is smaller
+    return Math.min(nextStart - 0.02, c.end + 0.35, duration);
+  });
+  const out = shifted.map((c, k) => {
+    const prevEnd = k > 0 ? newEnds[k-1] : 0;
+    const start = Math.max(prevEnd, c.start - 0.15, 0);
+    let end = newEnds[k];
+    if(end <= start + 0.05) end = Math.min(start + 0.3, duration);
+    return { start, end, text: c.text };
+  });
+  return out;
+}
+
 /* Get the effective (normalized) cues for an item */
 function ttsGetCues(item){
   if(!item || !item.srtCues || !item.srtCues.length) return null;
@@ -3387,14 +3430,18 @@ async function ttsAnalyzeAudio(i){
     // ★ Cache the decoded buffer — this is what we'll play segments from
     _ttsBufferCache[item.id] = audioBuf;
 
-    // ★ Normalize SRT cues against the REAL audio duration (handles offset SRTs)
-    if(item.srtCues && item.srtCues.length){
-      _ttsCuesCache[item.id] = ttsNormalizeSrtCues(item.srtCues, audioBuf.duration);
-    }
-
     const channelData = audioBuf.getChannelData(0);
     const sampleRate = audioBuf.sampleRate;
     const duration = audioBuf.duration;
+
+    // ★ Normalize SRT cues (offset correction) then refine against the actual signal
+    //   (speech-onset alignment + gap-consuming boundaries so no word is cut)
+    if(item.srtCues && item.srtCues.length){
+      let cues = ttsNormalizeSrtCues(item.srtCues, duration);
+      cues = ttsRefineCuesWithAudio(cues, channelData, sampleRate, duration);
+      _ttsCuesCache[item.id] = cues;
+      console.log('[TTS] refined cues:', cues.map(c=>`${c.start.toFixed(2)}→${c.end.toFixed(2)}`).join(' | '));
+    }
 
     // ── 1. Compute peaks for waveform visualization ──
     const BAR_COUNT = 90;
@@ -3826,8 +3873,8 @@ function ttsPlaySegment(i, buffer, startSec, endSec, onDone){
 
   // ★ THE KEY: start(when=now, offset=startSec, duration=segDuration)
   // The Web Audio engine stops playback after exactly segDuration seconds.
-  source.start(0, startSec, segDuration / source.playbackRate.value * source.playbackRate.value);
-  // Note: duration param is in buffer-time, playbackRate scales wall-clock automatically
+  // duration param is in buffer-content seconds; engine handles playbackRate scaling
+  source.start(0, startSec, segDuration);
 
   console.log('[TTS] ► segment', startSec.toFixed(2), '→', endSec.toFixed(2), '(', segDuration.toFixed(2), 's )');
 
