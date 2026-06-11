@@ -753,6 +753,24 @@ footer{text-align:center;padding:30px;color:var(--ink-soft);font-size:12.5px}
 .tts-tab.active{color:var(--teal);border-bottom-color:var(--teal)}
 .tts-transcript-panel{font-size:13.5px;color:var(--ink);line-height:1.8;direction:ltr;font-family:'Fraunces',serif;background:var(--paper-2);border-radius:10px;padding:12px 14px;display:none}
 .tts-transcript-panel.visible{display:block}
+/* full-transcript player (sentence-by-sentence, like listening sites) */
+.tts-tr-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px;color:var(--ink-soft)}
+.tts-tr-chk{display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:700;user-select:none}
+.tts-tr-chk input{accent-color:var(--teal)}
+.tts-tr-stage{background:var(--paper);border:1.5px solid var(--line);border-radius:12px;min-height:104px;display:flex;align-items:center;justify-content:center;padding:18px 16px;text-align:center;font-size:17px;line-height:1.6;direction:ltr;margin-bottom:8px;cursor:pointer;transition:.15s}
+.tts-tr-stage:hover{border-color:color-mix(in srgb,var(--teal) 45%,var(--line))}
+.tts-tr-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;direction:ltr}
+.tts-tr-nav button{background:var(--paper);border:1.5px solid var(--line);border-radius:9px;min-width:34px;height:31px;cursor:pointer;font-size:14px;color:var(--ink);transition:.15s;font-family:inherit}
+.tts-tr-nav button:hover{border-color:var(--teal);color:var(--teal)}
+.tts-tr-count{font-size:13px;font-weight:700;color:var(--ink-soft)}
+.tts-tr-list{max-height:300px;overflow-y:auto;border:1.5px solid var(--line);border-radius:12px;background:var(--paper)}
+.tts-tr-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;direction:ltr;font-size:14px;line-height:1.5;transition:.15s}
+.tts-tr-row:last-child{border-bottom:none}
+.tts-tr-row:hover{background:var(--paper-2)}
+.tts-tr-row.active{background:color-mix(in srgb,var(--teal) 14%,var(--paper))}
+.tts-tr-pbtn{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid var(--ink);background:var(--paper);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:var(--ink);transition:.15s;padding:0}
+.tts-tr-row.active .tts-tr-pbtn{border-color:var(--teal);color:var(--teal)}
+.tts-tr-kbd{font-size:11px;color:var(--ink-soft);margin-top:7px;direction:rtl;text-align:right}
 /* dictation */
 .tts-sent-dots{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
 .tts-sent-dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.3s;flex:none}
@@ -2744,9 +2762,11 @@ function _renderHorenUI(){
           }catch(_){}
         }
         ttsRenderSection(wrap);
+        ttsFixArchiveLinks().then(ch=>{if(ch)ttsRenderCards();}).catch(()=>{});
       }).catch(()=>ttsRenderSection(wrap));
     } else {
       ttsRenderSection(wrap);
+      ttsFixArchiveLinks().then(ch=>{if(ch)ttsRenderCards();}).catch(()=>{});
     }
   }
 
@@ -3288,6 +3308,52 @@ window._ttsFireSave=null;window._ttsFireDelete=null;window._ttsFireLoad=null;
 function ttsSaveLocal(){try{localStorage.setItem('tts_items_v1',JSON.stringify(ttsItems));}catch(e){}}
 function ttsLoadLocal(){try{const d=JSON.parse(localStorage.getItem('tts_items_v1')||'[]');if(Array.isArray(d))ttsItems=d;}catch(e){}}
 
+/* ── Archive.org link resolver ──
+   A /details/ link is an HTML page, not an audio file. Resolve it to a
+   direct https://archive.org/download/{id}/{file} link via the metadata
+   API (CORS-enabled), preferring mp3. */
+async function ttsResolveArchiveUrl(url){
+  try{
+    const m=String(url||'').match(/^https?:\/\/(?:www\.)?archive\.org\/(details|download)\/([^\/?#]+)\/?([^?#]*)/i);
+    if(!m)return url;
+    const id=m[2],rest=m[3]||'';
+    if(m[1].toLowerCase()==='download'&&/\.(mp3|m4a|ogg|oga|opus|wav|flac|aac|webm)$/i.test(rest))return url;
+    const resp=await fetch('https://archive.org/metadata/'+encodeURIComponent(id));
+    if(!resp.ok)return url;
+    const meta=await resp.json();
+    const files=(meta&&meta.files)||[];
+    const exts=['.mp3','.m4a','.ogg','.oga','.opus','.wav','.flac'];
+    let best=null,bestScore=-1;
+    files.forEach(f=>{
+      const n=(f.name||'').toLowerCase();
+      const i=exts.findIndex(e=>n.endsWith(e));
+      if(i<0)return;
+      const score=(exts.length-i)*10+(f.source==='original'?5:0);
+      if(score>bestScore){bestScore=score;best=f;}
+    });
+    if(!best)return url;
+    return 'https://archive.org/download/'+id+'/'+encodeURIComponent(best.name).replace(/%2F/gi,'/');
+  }catch(e){console.warn('archive resolve:',e);return url;}
+}
+function ttsIsArchivePageLink(u){return /^https?:\/\/(?:www\.)?archive\.org\/details\//i.test(String(u||''));}
+
+/* Fix items already saved with /details/ links (runs after load) */
+async function ttsFixArchiveLinks(){
+  const bad=ttsItems.filter(it=>it&&it.audioType==='url'&&ttsIsArchivePageLink(it.audioUrl));
+  if(!bad.length)return false;
+  let changed=false;
+  await Promise.all(bad.map(async it=>{
+    const fixed=await ttsResolveArchiveUrl(it.audioUrl);
+    if(fixed&&fixed!==it.audioUrl){
+      it.audioUrl=fixed;changed=true;
+      const isAdm=window._currentUser&&window._currentUser.email===ADMIN_EMAIL;
+      if(isAdm&&window._ttsFireSave)try{window._ttsFireSave(it);}catch(_){}
+    }
+  }));
+  if(changed)ttsSaveLocal();
+  return changed;
+}
+
 /* ── Helpers ── */
 function ttsSplitSentences(text){return(text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[text]).map(s=>s.trim()).filter(Boolean);}
 
@@ -3817,7 +3883,21 @@ function ttsBuildCard(item,i){
         <div id="tts-complete-${i}" style="display:none"></div>
       </div>
       <div class="tts-transcript-panel" id="tts-transcript-${i}">
-        ${sentences.map((s,si)=>`<p id="tts-ts-${i}-${si}" style="padding:3px 6px;border-radius:6px;margin-bottom:4px;cursor:pointer;direction:ltr" onclick="ttsJumpTo(${i},${si})">${escHtml(s)}</p>`).join('')}
+        <div class="tts-tr-top" dir="ltr">
+          <label class="tts-tr-chk"><input type="checkbox" id="tts-tr-repeat-${i}" onchange="ttsTrSetRepeat(${i},this.checked)"> Repeat</label>
+          <label class="tts-tr-chk"><input type="checkbox" id="tts-tr-as-${i}" checked onchange="ttsTrSetAS(${i},this.checked)"> Auto scroll</label>
+        </div>
+        <div class="tts-tr-stage" id="tts-tr-stage-${i}" onclick="ttsTrToggle(${i})" title="انقر للتشغيل/الإيقاف">${escHtml(sentences[0]||'')}</div>
+        <div class="tts-tr-nav">
+          <button onclick="ttsTrNav(${i},-1)" title="الجملة السابقة">←</button>
+          <button onclick="ttsTrToggle(${i})" id="tts-tr-play-${i}" style="min-width:44px;font-size:15px">▶</button>
+          <span class="tts-tr-count"><span id="tts-tr-num-${i}">1</span> / ${sentences.length}</span>
+          <button onclick="ttsTrNav(${i},1)" title="الجملة التالية">→</button>
+        </div>
+        <div class="tts-tr-list" id="tts-tr-list-${i}">
+          ${sentences.map((s,si)=>`<div class="tts-tr-row${si===0?' active':''}" id="tts-tr-row-${i}-${si}" onclick="ttsTrPlay(${i},${si})"><button class="tts-tr-pbtn" id="tts-tr-pb-${i}-${si}" onclick="event.stopPropagation();ttsTrPlay(${i},${si})">▶</button><span>${escHtml(s)}</span></div>`).join('')}
+        </div>
+        <div class="tts-tr-kbd">مسافة = تشغيل/إيقاف · ← → = تنقّل بين الجمل</div>
       </div>
     </div>`;
   if(!hasExternalAudio){
@@ -3832,6 +3912,16 @@ function ttsShowTab(i,tab,btn){
   const dict=document.getElementById('tts-dictation-'+i);const trans=document.getElementById('tts-transcript-'+i);
   if(dict)dict.style.display=tab==='dictation'?'':'none';
   if(trans)trans.classList.toggle('visible',tab==='transcript');
+  if(tab==='transcript'){
+    // Pause dictation audio, sync transcript to current dictation sentence
+    window.speechSynthesis.cancel();ttsStopSegment();
+    ttsIsPaused=true;ttsUpdateButtons(i,'▶',false);
+    const ds=ttsGetState(i);const ts=ttsTrGet(i);
+    ts.idx=Math.min(ds.sentIdx,Math.max(0,ttsGetSentences(ttsItems[i]).length-1));
+    ttsTrPaint(i);
+  }else{
+    ttsTrPause(i);
+  }
 }
 
 /* ── Card open ── */
@@ -4210,6 +4300,7 @@ function ttsStopCurrent(){
     const op=document.getElementById('tts-player-'+ttsCurrent);if(op)op.style.display='none';
     const oc=document.getElementById('tts-card-'+ttsCurrent);if(oc)oc.classList.remove('tts-playing');
     ttsUpdateButtons(ttsCurrent,'▶',false);
+    if(ttsTrState[ttsCurrent])ttsTrState[ttsCurrent].playing=false;
   }
   ttsCurrent=-1;ttsPausedAt=0;ttsIsPaused=false;ttsElapsed=0;_ttsSegPausedAt=0;
 }
@@ -4230,6 +4321,138 @@ function ttsJumpTo(i,si){
   ttsRenderDictationState(i);
   ttsPlaySentence(i);  // segment timing handled inside
 }
+
+/* ════════ Full-transcript player (sentence list + stage, like listening sites) ════════ */
+const ttsTrState={};
+function ttsTrGet(i){if(!ttsTrState[i])ttsTrState[i]={idx:0,repeat:false,as:true,playing:false};return ttsTrState[i];}
+function ttsTrSetRepeat(i,v){ttsTrGet(i).repeat=!!v;}
+function ttsTrSetAS(i,v){ttsTrGet(i).as=!!v;}
+
+/* Compute sentence segment bounds (same logic as dictation playback) */
+function ttsTrBounds(item,si,sentences,buffer){
+  let start=0,end=buffer.duration;
+  const cues=ttsGetCues(item);
+  if(cues&&cues[si]){
+    start=Number(cues[si].start)||0;
+    end=Number(cues[si].end)||buffer.duration;
+  }else{
+    const t=_ttsTimingsCache[item.id];
+    if(t&&t[si]!=null){start=Number(t[si])||0;end=t[si+1]!=null?Number(t[si+1]):buffer.duration;}
+    else{const seg=buffer.duration/sentences.length;start=si*seg;end=(si+1)*seg;}
+  }
+  start=Math.max(0,Math.min(start,Math.max(0,buffer.duration-0.05)));
+  end=Math.max(start+0.05,Math.min(end,buffer.duration));
+  return{start,end};
+}
+
+function ttsTrPaint(i){
+  const item=ttsItems[i];if(!item)return;
+  const sentences=ttsGetSentences(item);
+  const st=ttsTrGet(i);
+  const stage=document.getElementById('tts-tr-stage-'+i);
+  if(stage)stage.textContent=sentences[st.idx]||'';
+  const num=document.getElementById('tts-tr-num-'+i);
+  if(num)num.textContent=(st.idx+1);
+  const pbtn=document.getElementById('tts-tr-play-'+i);
+  if(pbtn)pbtn.textContent=st.playing?'⏸':'▶';
+  sentences.forEach((_,k)=>{
+    const row=document.getElementById('tts-tr-row-'+i+'-'+k);
+    if(row)row.classList.toggle('active',k===st.idx);
+    const pb=document.getElementById('tts-tr-pb-'+i+'-'+k);
+    if(pb)pb.textContent=(k===st.idx&&st.playing)?'⏸':'▶';
+  });
+  if(st.as){
+    const row=document.getElementById('tts-tr-row-'+i+'-'+st.idx);
+    const list=document.getElementById('tts-tr-list-'+i);
+    if(row&&list){
+      const top=row.offsetTop-list.offsetTop;
+      list.scrollTo({top:Math.max(0,top-list.clientHeight/2+row.clientHeight/2),behavior:'smooth'});
+    }
+  }
+}
+
+function ttsTrPause(i){
+  const st=ttsTrGet(i);
+  if(!st.playing)return;
+  st.playing=false;
+  window.speechSynthesis.cancel();
+  ttsStopSegment();
+  ttsTrPaint(i);
+}
+
+function ttsTrPlay(i,si){
+  const item=ttsItems[i];if(!item)return;
+  const sentences=ttsGetSentences(item);
+  if(si<0)si=0;
+  if(si>=sentences.length)si=sentences.length-1;
+  // Toggle pause when tapping the already-playing sentence
+  const st=ttsTrGet(i);
+  if(st.playing&&st.idx===si){ttsTrPause(i);return;}
+  st.idx=si;st.playing=true;
+  ttsTrPaint(i);
+  // Unlock audio context (autoplay policy) + stop other playback
+  const ctx=ttsGetAudioCtx();if(ctx&&ctx.state==='suspended')ctx.resume().catch(()=>{});
+  window.speechSynthesis.cancel();
+  if(ttsRafId){cancelAnimationFrame(ttsRafId);ttsRafId=null;}
+
+  if(item.audioUrl){
+    const go=(buffer)=>{
+      if(!st.playing||st.idx!==si)return; // user moved on while decoding
+      const b=ttsTrBounds(item,si,sentences,buffer);
+      ttsPlaySegment(i,buffer,b.start,b.end,()=>{
+        if(!st.playing||st.idx!==si)return;
+        if(st.repeat){st.playing=false;ttsTrPlay(i,si);return;}
+        if(si+1<sentences.length){st.playing=false;ttsTrPlay(i,si+1);}
+        else{st.playing=false;ttsTrPaint(i);}
+      });
+    };
+    const cached=_ttsBufferCache[item.id];
+    if(cached)go(cached);
+    else ttsAnalyzeAudio(i).then(r=>{
+      if(r&&r.buffer){ttsRenderRealWaveform(i);go(r.buffer);}
+      else{st.playing=false;ttsTrPaint(i);}
+    });
+  }else{
+    // Text-only items: speak with the best German voice
+    const u=new SpeechSynthesisUtterance(sentences[si]);
+    u.lang='de-DE';u.rate=ttsRate;u.volume=ttsMuted?0:ttsVolume;
+    const vs=ttsGetGermanVoices();if(vs[0])u.voice=vs[0];
+    u.onend=()=>{
+      if(!st.playing||st.idx!==si)return;
+      if(st.repeat){st.playing=false;ttsTrPlay(i,si);return;}
+      if(si+1<sentences.length){st.playing=false;ttsTrPlay(i,si+1);}
+      else{st.playing=false;ttsTrPaint(i);}
+    };
+    window.speechSynthesis.speak(u);
+  }
+}
+
+function ttsTrToggle(i){
+  const st=ttsTrGet(i);
+  if(st.playing)ttsTrPause(i);
+  else ttsTrPlay(i,st.idx);
+}
+function ttsTrNav(i,d){
+  const item=ttsItems[i];if(!item)return;
+  const sentences=ttsGetSentences(item);
+  const st=ttsTrGet(i);
+  const ni=Math.max(0,Math.min(sentences.length-1,st.idx+d));
+  if(ni===st.idx&&st.playing)return;
+  if(st.playing){st.playing=false;ttsStopSegment();window.speechSynthesis.cancel();ttsTrPlay(i,ni);}
+  else{st.idx=ni;ttsTrPaint(i);}
+}
+
+/* Keyboard: Space = play/pause, ←/→ = move between sentences (transcript tab open) */
+document.addEventListener('keydown',e=>{
+  if(ttsCurrent<0)return;
+  const trans=document.getElementById('tts-transcript-'+ttsCurrent);
+  if(!trans||!trans.classList.contains('visible'))return;
+  const tag=(e.target&&e.target.tagName||'').toLowerCase();
+  if(tag==='input'||tag==='textarea'||tag==='select'||(e.target&&e.target.isContentEditable))return;
+  if(e.key===' '||e.code==='Space'){e.preventDefault();ttsTrToggle(ttsCurrent);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();ttsTrNav(ttsCurrent,-1);}
+  else if(e.key==='ArrowRight'){e.preventDefault();ttsTrNav(ttsCurrent,1);}
+});
 function ttsShowComplete(i){
   const st=ttsGetState(i);const sentences=ttsGetSentences(ttsItems[i]);
   const correct=st.scores.filter(v=>v===true).length;const total=sentences.length;const pct=Math.round(correct/total*100);
@@ -4812,9 +5035,18 @@ async function ttsConfirmAdd(){
     audioUrl=audioData;
     audioType='file';
   } else {
-    const url=(urlInput?.value||'').trim();
+    let url=(urlInput?.value||'').trim();
     if(!url){alert('أضف رابطًا للملف الصوتي');return;}
     if(!/^https?:\/\//.test(url)){alert('الرابط يجب أن يبدأ بـ http:// أو https://');return;}
+    // Archive.org "details" links are HTML pages — resolve to the direct audio file
+    if(/archive\.org/i.test(url)){
+      const resolved=await ttsResolveArchiveUrl(url);
+      if(ttsIsArchivePageLink(resolved)){
+        alert('لم يُعثر على ملف صوتي في صفحة archive.org هذه. تأكد أن العنصر يحتوي ملف MP3.');
+        return;
+      }
+      url=resolved;
+    }
     audioUrl=url;
     audioType='url';
   }
