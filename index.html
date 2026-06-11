@@ -1176,6 +1176,16 @@ try{wKnown=JSON.parse(localStorage.getItem(WKEY)||'{}')}catch(e){}
 try{vKnown=JSON.parse(localStorage.getItem(VKEY)||'{}')}catch(e){}
 function saveW(){try{localStorage.setItem(WKEY,JSON.stringify(wKnown))}catch(e){}}
 function saveV(){try{localStorage.setItem(VKEY,JSON.stringify(vKnown))}catch(e){}}
+
+/* ---- Adjektive progress (متقَن) ---- */
+const AKEY='adjektive_known_v1';
+let aKnown={};
+try{aKnown=JSON.parse(localStorage.getItem(AKEY)||'{}')}catch(e){}
+function saveA(){try{localStorage.setItem(AKEY,JSON.stringify(aKnown))}catch(e){}}
+const aIsKnown=n=>!!aKnown[n];
+function aToggle(n){if(aKnown[n])delete aKnown[n];else aKnown[n]=1;saveA();}
+const aCount=()=>Object.keys(aKnown).length;
+function aTotal(){return (typeof ADJ_DATA!=='undefined')?ADJ_DATA.length:100;}
 const wid=(c,i)=>c+'_'+i;
 const wIsKnown=(c,i)=>!!wKnown[wid(c,i)];
 function wToggle(c,i){const k=wid(c,i);if(wKnown[k])delete wKnown[k];else wKnown[k]=1;saveW();}
@@ -1293,8 +1303,8 @@ document.getElementById('brand').onclick=()=>setView('home');
 let st;searchInput.oninput=e=>{const q=e.target.value.trim();if(view==='words')W.query=q;else V.query=q;clearTimeout(st);st=setTimeout(render,160)};
 
 function updateGlobalTree(){
-  const wk=wCount(),vk=vCount();
-  const tot=WTOTAL+VTOTAL,tk=wk+vk;
+  const wk=wCount(),vk=vCount(),ak=aCount();
+  const tot=WTOTAL+VTOTAL+aTotal(),tk=wk+vk+ak;
   const wp=Math.round(wk/WTOTAL*100),vp=Math.round(vk/VTOTAL*100);
   let tasksDone=0;
   try{const ts=JSON.parse(localStorage.getItem('dt_tasks_v3')||'{}');tasksDone=Object.values(ts).filter(e=>e&&e.done).length;}catch(e){}
@@ -1663,9 +1673,9 @@ function buildTreeSVG(tp, wp, vp){
 
 
 function renderHome(){
-  const wk=wCount(),vk=vCount();
+  const wk=wCount(),vk=vCount(),ak=aCount();
   const wp=Math.round(wk/WTOTAL*100),vp=Math.round(vk/VTOTAL*100);
-  const tot=WTOTAL+VTOTAL,tk=wk+vk;
+  const tot=WTOTAL+VTOTAL+aTotal(),tk=wk+vk+ak;
   let tasksDone=0;
   try{const ts=JSON.parse(localStorage.getItem('dt_tasks_v3')||'{}');tasksDone=Object.values(ts).filter(e=>e&&e.done).length;}catch(e){}
   const taskPct=Math.round(tasksDone/16*100);
@@ -1743,7 +1753,7 @@ function renderHome(){
   const gh=document.getElementById('goHoren'); if(gh) gh.onclick=()=>setView('horen');
   const gs=document.getElementById('goSchreiben'); if(gs) gs.onclick=()=>setView('schreiben');
   const ga=document.getElementById('goAdjektive'); if(ga) ga.onclick=()=>setView('adjektive');
-  document.getElementById('resetAll').onclick=()=>{if(confirm('تصفير كل تقدّمك في المفردات والأفعال؟')){wKnown={};vKnown={};saveW();saveV();render()}};
+  document.getElementById('resetAll').onclick=()=>{if(confirm('تصفير كل تقدّمك في المفردات والأفعال والصفات؟')){wKnown={};vKnown={};aKnown={};saveW();saveV();saveA();render()}};
   requestAnimationFrame(heroCanvasInit);
 }
 
@@ -1937,7 +1947,18 @@ function wSel(){
   return {icon:c.icon,ar:c.ar,de:c.de,items:c.items.map((it,i)=>({it,ci:W.cat,i})),len:c.items.length};
 }
 function wSelKnown(sel){let n=0;sel.items.forEach(e=>{if(wIsKnown(e.ci,e.i))n++});return n}
-function wHead(sel){return `<div class="panel-head fade"><span class="icn">${sel.icon}</span><h2>${esc(sel.ar)}<span class="sub de">${esc(sel.de)}</span></h2><span class="count">${wSelKnown(sel)} / ${sel.len} متقَن</span></div>`}
+function wHead(sel){
+  const resetBtn = sel.all ? '' : `<button onclick="wResetGroup()" title="تصفير التقدم في هذه المجموعة فقط"
+    style="margin-inline-start:8px;padding:5px 12px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:700;background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);color:#c0392b;white-space:nowrap">↺ تصفير المجموعة</button>`;
+  return `<div class="panel-head fade"><span class="icn">${sel.icon}</span><h2>${esc(sel.ar)}<span class="sub de">${esc(sel.de)}</span></h2><span class="count">${wSelKnown(sel)} / ${sel.len} متقَن</span>${resetBtn}</div>`}
+function wResetGroup(){
+  if(W.cat==='all')return;
+  const cat=WORDS[W.cat];if(!cat)return;
+  if(!confirm(`تصفير تقدّمك في مجموعة "${cat.ar}" فقط؟ (${cat.items.length} كلمة)`))return;
+  cat.items.forEach((_,i)=>{const k=wid(W.cat,i);delete wKnown[k]});
+  saveW();
+  renderWSide();updateWStat();renderWMain();
+}
 function wBrowse(m){
   const sel=wSel();
   m.innerHTML=wHead(sel)+'<div class="words fade">'+sel.items.map(e=>{
@@ -2113,7 +2134,9 @@ function vcardHTML(v){
 }
 function vBrowse(m,list,isSearch){
   const title=isSearch?`<h2>نتائج البحث<span class="sub de">"${esc(V.query)}"</span></h2>`:`<h2>${V.level==='all'?'كل الأفعال':LVLNAME[V.level]+' — '+V.level}<span class="sub de">Verben</span></h2>`;
-  let h=(isSearch?'':vFilters())+`<div class="panel-head fade">${title}<span class="count">${list.length} فعل</span></div>`;
+  const lvlReset=(!isSearch&&V.level!=='all')?`<button onclick="vResetLevel()" title="تصفير التقدم في هذا المستوى فقط"
+    style="margin-inline-start:8px;padding:5px 12px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:700;background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);color:#c0392b;white-space:nowrap">↺ تصفير مستوى ${V.level}</button>`:'';
+  let h=(isSearch?'':vFilters())+`<div class="panel-head fade">${title}<span class="count">${list.length} فعل</span>${lvlReset}</div>`;
   if(!list.length){m.innerHTML=h+`<div class="empty"><div class="e">🪹</div>لا توجد أفعال مطابقة</div>`;if(!isSearch)bindVFilters(m);return}
   h+='<div class="verbs fade">'+list.map(vcardHTML).join('')+'</div>';m.innerHTML=h;
   if(!isSearch)bindVFilters(m);
@@ -2346,6 +2369,15 @@ function qResult(host){
 
 /* reset per section */
 function resetSection(s){if(!confirm('تصفير التقدّم في هذا القسم؟'))return;if(s==='words'){wKnown={};saveW();renderWords()}else{vKnown={};saveV();renderVerbs()}}
+/* reset verbs of the selected level only */
+function vResetLevel(){
+  if(V.level==='all')return;
+  const lvlVerbs=VERBS.filter(v=>v.lvl===V.level);
+  if(!confirm(`تصفير تقدّمك في أفعال المستوى ${V.level} فقط؟ (${lvlVerbs.length} فعل)`))return;
+  lvlVerbs.forEach(v=>{delete vKnown[v._id]});
+  saveV();
+  renderVSide();updateVStat();renderVMain();
+}
 
 /* keyboard nav for flashcards */
 document.addEventListener('keydown',e=>{
@@ -5182,7 +5214,9 @@ function renderProfile(){
 
   const totalW = Object.keys(wKnown).length;
   const totalV = Object.keys(vKnown).length;
-  const totalProgress = Math.round((totalW+totalV)/(WTOTAL+VTOTAL)*100);
+  const totalA = aCount();
+  const grandTotal = WTOTAL + VTOTAL + aTotal();
+  const totalProgress = Math.round((totalW+totalV+totalA)/grandTotal*100);
 
   const levelColors = {A1:'#9b59b6',A2:'#1D9E75',B1:'#7F77DD',B2:'#D85A30',C1:'#c0392b'};
   const currentLvl = localStorage.getItem('dt_level')||'B1';
@@ -5206,7 +5240,7 @@ function renderProfile(){
     ${buildLevelCardHTML()}
 
     <!-- Stats grid -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px">
       <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
         <div style="font-size:26px;font-weight:800;color:var(--teal)">${totalW}</div>
         <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px">كلمة متقنة</div>
@@ -5214,6 +5248,10 @@ function renderProfile(){
       <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
         <div style="font-size:26px;font-weight:800;color:var(--green)">${totalV}</div>
         <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px">فعل متقن</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
+        <div style="font-size:26px;font-weight:800;color:#c8821f">${totalA}</div>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px">صفة متقنة</div>
       </div>
       <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center;box-shadow:var(--shadow)">
         <div style="font-size:26px;font-weight:800;color:var(--amber)">${totalProgress}%</div>
@@ -5225,7 +5263,7 @@ function renderProfile(){
     <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:14px;font-weight:700;color:var(--ink)">التقدّم الكلي</span>
-        <span style="font-size:13px;font-weight:700;color:var(--teal)">${totalW+totalV} / ${WTOTAL+VTOTAL}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--teal)">${totalW+totalV+totalA} / ${grandTotal}</span>
       </div>
       <div style="background:var(--paper-2);border-radius:99px;height:8px;overflow:hidden">
         <div style="width:${totalProgress}%;background:linear-gradient(90deg,var(--teal),var(--blue));height:100%;border-radius:99px;transition:width .4s"></div>
@@ -5256,7 +5294,7 @@ function renderProfile(){
         style="display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;background:var(--paper-2);border:1px solid var(--line);border-radius:12px;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;font-family:inherit;margin-bottom:8px;text-align:start;transition:.15s">
         🔄 مزامنة التقدم الآن
       </button>
-      <button onclick="if(confirm('تصفير كل التقدم؟')){wKnown={};vKnown={};saveW();saveV();render()}"
+      <button onclick="if(confirm('تصفير كل التقدم؟')){wKnown={};vKnown={};aKnown={};saveW();saveV();saveA();render()}"
         style="display:flex;align-items:center;gap:8px;width:100%;padding:11px 14px;background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);border-radius:12px;font-size:13.5px;font-weight:700;color:#c0392b;cursor:pointer;font-family:inherit;margin-bottom:8px;text-align:start">
         🗑️ تصفير كل التقدم
       </button>
@@ -5284,8 +5322,8 @@ const LEVEL_ORDER = ['A1','A2','B1','B2','C1'];
 
 /* Get overall progress % */
 function overallPct(){
-  const total = WTOTAL + VTOTAL;
-  const known = Object.keys(wKnown).length + Object.keys(vKnown).length;
+  const total = WTOTAL + VTOTAL + aTotal();
+  const known = Object.keys(wKnown).length + Object.keys(vKnown).length + aCount();
   return total ? Math.round(known / total * 100) : 0;
 }
 
@@ -5633,12 +5671,17 @@ function adjStart(){
 function adjBrowsePaint(){
   const m=document.getElementById('adjMain');if(!m)return;
   const pool=adjGetPool();
-  m.innerHTML=`<div class="adj-browse-grid">${pool.map(a=>`
-    <div class="adj-browse-card" onclick="adjShowDetail(${a.num})">
-      <div class="adj-browse-num">#${a.num}</div>
+  m.innerHTML=`<div class="adj-browse-grid">${pool.map(a=>{
+    const kn=aIsKnown(a.num);
+    return `
+    <div class="adj-browse-card" onclick="adjShowDetail(${a.num})" style="${kn?'border-color:var(--green);background:rgba(31,107,83,.06)':''}">
+      <div class="adj-browse-num" style="display:flex;align-items:center;justify-content:space-between">#${a.num}
+        <button class="adj-known-chk" onclick="event.stopPropagation();aToggle(${a.num});adjBrowsePaint();adjUpdateScoreBar()" title="متقَن"
+          style="width:24px;height:24px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;font-family:inherit;border:1.5px solid ${kn?'var(--green)':'var(--line)'};background:${kn?'var(--green)':'transparent'};color:${kn?'#fff':'var(--ink-soft)'}">✓</button>
+      </div>
       <div class="adj-browse-pair"><span class="adj-browse-de">${a.de}</span><span class="adj-browse-arrow"> ⟷ </span><span class="adj-browse-opp">${a.opp}</span></div>
       <div class="adj-browse-ar">${a.ar}</div>
-    </div>`).join('')}</div>`;
+    </div>`}).join('')}</div>`;
 }
 
 function adjShowDetail(num){
@@ -5665,6 +5708,10 @@ function adjShowDetail(num){
           <div class="adj-detail-ex-de">${a.ex}</div>
           <div class="adj-detail-ex-ar">${a.exAr}</div>
         </div>
+        <button onclick="aToggle(${a.num});adjShowDetail(${a.num})"
+          style="display:block;width:100%;margin:14px 0 0;padding:11px;border-radius:12px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;border:1.5px solid ${aIsKnown(a.num)?'var(--green)':'var(--line)'};background:${aIsKnown(a.num)?'var(--green)':'var(--paper-2)'};color:${aIsKnown(a.num)?'#fff':'var(--ink)'}">
+          ${aIsKnown(a.num)?'✓ متقَنة — اضغط للإلغاء':'علّمها كمتقَنة ✓'}
+        </button>
         <div class="adj-detail-nav">
           ${a.num>1?`<button class="adj-nav-btn" onclick="adjShowDetail(${a.num-1})">← السابق</button>`:'<span></span>'}
           <span class="adj-detail-counter">${a.num} / ${ADJ_DATA.length}</span>
@@ -5724,11 +5771,13 @@ function adjAnswer(btn,correct){
     b.disabled=true;
     if(b.dataset.correct==='true')b.classList.add('correct');
   });
+  const cur=adjState.queue[adjState.idx];
   if(isCorrect){
     btn.classList.add('correct');
     adjState.score++;adjState.streak++;
     if(adjState.streak>adjState.maxStreak)adjState.maxStreak=adjState.streak;
     document.getElementById('adjWord').classList.add('correct');
+    if(cur&&!aIsKnown(cur.num)){aToggle(cur.num);adjUpdateScoreBar();}
   } else {
     btn.classList.add('wrong');
     adjState.wrong++;adjState.streak=0;
@@ -5777,6 +5826,9 @@ function renderAdjektive(){
       <div class="adj-score-pill">✅ صحيح <span id="adjScoreDisp" style="color:var(--green)">0</span></div>
       <div class="adj-score-pill">❌ خطأ <span id="adjWrongDisp" style="color:var(--rust)">0</span></div>
       <div class="adj-score-pill">🔥 سلسلة <span id="adjStreakDisp" style="color:var(--amber)">0</span></div>
+      <div class="adj-score-pill">🎓 متقَن <span id="adjKnownDisp" style="color:var(--teal)">${aCount()}</span>/<span id="adjTotalDisp">${aTotal()}</span></div>
+      <button onclick="adjResetGroup()" title="تصفير التقدم في هذه المجموعة"
+        style="margin-inline-start:auto;padding:6px 12px;border-radius:99px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);color:#c0392b">↺ تصفير ${adjState.group==='الكل'?'الكل':'المجموعة '+adjState.group}</button>
     </div>
     <div class="adj-modes">
       <button class="adj-mode-btn ${adjState.mode==='browse'?'active':''}" onclick="adjSetMode('browse')">📖 تصفح الصفات</button>
@@ -5797,6 +5849,8 @@ function renderAdjektive(){
     if(s)s.textContent=adjState.score;
     if(w)w.textContent=adjState.wrong;
     if(st)st.textContent=adjState.streak;
+    const kd=document.getElementById('adjKnownDisp');
+    if(kd)kd.textContent=aCount();
     if(!document.getElementById('adjMain'))clearInterval(window._adjPaintHook);
   },300);
   adjStart();
@@ -5810,6 +5864,17 @@ function adjSetMode(m){
 }
 function adjSetGroup(g){
   adjState.group=g;
+  if(view==='adjektive')renderAdjektive();
+}
+function adjUpdateScoreBar(){
+  const k=document.getElementById('adjKnownDisp');if(k)k.textContent=aCount();
+}
+function adjResetGroup(){
+  const g=adjState.group;
+  const msg=g==='الكل'?'تصفير تقدّمك في كل الصفات؟':`تصفير تقدّمك في صفات المجموعة ${g}؟`;
+  if(!confirm(msg))return;
+  adjGetPool().forEach(a=>{delete aKnown[a.num]});
+  saveA();
   if(view==='adjektive')renderAdjektive();
 }
 
@@ -5915,7 +5980,7 @@ function updateUserUI(user) {
 }
 
 // ── Sync keys ──
-const KEYS = ['wortschatz_known_v1','verben_known_v1','wortschatz_custom_v1',
+const KEYS = ['wortschatz_known_v1','verben_known_v1','adjektive_known_v1','wortschatz_custom_v1',
               'verben_custom_v1','wortschatz_custom_cats_v1','dt_tasks_v3','dt_level','deutsch_theme'];
 
 function getSnapshot() {
