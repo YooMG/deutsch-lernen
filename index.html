@@ -2718,7 +2718,31 @@ function _renderHorenUI(){
     ttsLoadLocal();
     if(window._ttsFireLoad){
       window._ttsFireLoad().then(items=>{
-        if(items&&items.length){ttsItems=items;ttsSaveLocal();}
+        if(items&&items.length){
+          // Merge: if a cloud item is missing its audio (chunks failed to
+          // load or legacy item saved before chunking), keep the locally
+          // cached audioUrl so playback never breaks on this device.
+          const localById={};ttsItems.forEach(it=>{if(it&&it.id)localById[it.id]=it;});
+          items.forEach(it=>{
+            if(!it.audioUrl){
+              const loc=localById[it.id];
+              if(loc&&loc.audioUrl)it.audioUrl=loc.audioUrl;
+            }
+          });
+          ttsItems=items;ttsSaveLocal();
+          // Legacy repair: admin re-uploads items whose audio exists only
+          // locally so every other user/device gets the sound too.
+          try{
+            const isAdm=window._currentUser&&window._currentUser.email===ADMIN_EMAIL;
+            if(isAdm&&window._ttsFireSave){
+              ttsItems.forEach(it=>{
+                if(it.audioUrl&&it.audioUrl.length>900000&&!it.audioChunks){
+                  window._ttsFireSave(it).catch(()=>{});
+                }
+              });
+            }
+          }catch(_){}
+        }
         ttsRenderSection(wrap);
       }).catch(()=>ttsRenderSection(wrap));
     } else {
@@ -6069,27 +6093,78 @@ window.syncNow = async () => {
 };
 
 // ── TTS Firestore integration ──
+// Firestore limits a document to ~1MB, so large base64 audio is split into
+// chunks stored in the subcollection ttsTexts/{id}/audio/{p0,p1,...}.
+// Every user on every device reassembles the chunks on load.
+const TTS_CHUNK = 700000; // chars per chunk (safe under the 1MB doc limit)
+
 window._ttsFireSave = async (item) => {
   try {
-    // Firestore field limit is 1MB. Don't save big base64 audio data.
-    // Save only metadata; the file stays in localStorage for the admin user.
     const safe = {...item};
-    if(safe.audioType === 'file' && safe.audioUrl && safe.audioUrl.length > 900000){
-      // Strip the heavy audio data for Firestore
+    delete safe.audioStoredLocally;
+    if(safe.audioUrl && safe.audioUrl.length > 900000){
+      const data = safe.audioUrl;
       delete safe.audioUrl;
-      safe.audioStoredLocally = true;
+      const total = Math.ceil(data.length / TTS_CHUNK);
+      safe.audioChunks = total;
+      // Upload all chunks first, then the metadata doc (so readers never
+      // see a doc pointing to chunks that don't exist yet).
+      const jobs=[];
+      for(let i=0;i<total;i++){
+        jobs.push(setDoc(doc(db,'ttsTexts',safe.id,'audio','p'+i),
+          {part:i,total,data:data.slice(i*TTS_CHUNK,(i+1)*TTS_CHUNK)}));
+      }
+      await Promise.all(jobs);
+      // Remove stale extra chunks from a previous, longer version
+      try{
+        const old=await getDocs(collection(db,'ttsTexts',safe.id,'audio'));
+        const dels=[];
+        old.forEach(d=>{const n=parseInt(d.id.slice(1),10);if(n>=total)dels.push(deleteDoc(d.ref));});
+        if(dels.length)await Promise.all(dels);
+      }catch(_){}
+    } else {
+      safe.audioChunks = 0;
+      // Audio is small (or absent): clean up any old chunks
+      try{
+        const old=await getDocs(collection(db,'ttsTexts',safe.id,'audio'));
+        const dels=[];old.forEach(d=>dels.push(deleteDoc(d.ref)));
+        if(dels.length)await Promise.all(dels);
+      }catch(_){}
     }
     await setDoc(doc(db,'ttsTexts',safe.id), safe);
   } catch(e){ console.warn('TTS save:',e); }
 };
 window._ttsFireDelete = async (id) => {
-  try { await deleteDoc(doc(db,'ttsTexts',id)); } catch(e){ console.warn('TTS del:',e); }
+  try {
+    // Delete audio chunks first, then the metadata doc
+    try{
+      const snap=await getDocs(collection(db,'ttsTexts',id,'audio'));
+      const dels=[];snap.forEach(d=>dels.push(deleteDoc(d.ref)));
+      if(dels.length)await Promise.all(dels);
+    }catch(_){}
+    await deleteDoc(doc(db,'ttsTexts',id));
+  } catch(e){ console.warn('TTS del:',e); }
 };
 window._ttsFireLoad = async () => {
   try {
     const q=query(collection(db,'ttsTexts'),orderBy('createdAt','asc'));
     const snap=await getDocs(q);
-    return snap.docs.map(d=>d.data());
+    const items=snap.docs.map(d=>d.data());
+    // Reassemble chunked audio for every item (all users, all devices)
+    await Promise.all(items.map(async it=>{
+      if(it.audioChunks>0 && !it.audioUrl){
+        try{
+          const cs=await getDocs(collection(db,'ttsTexts',it.id,'audio'));
+          const parts=[];
+          cs.forEach(d=>{const v=d.data();if(v&&typeof v.part==='number')parts.push(v);});
+          if(parts.length===it.audioChunks){
+            parts.sort((a,b)=>a.part-b.part);
+            it.audioUrl=parts.map(p=>p.data).join('');
+          }
+        }catch(e){console.warn('TTS chunks:',it.id,e);}
+      }
+    }));
+    return items;
   } catch(e){ console.warn('TTS load:',e);return []; }
 };
 
