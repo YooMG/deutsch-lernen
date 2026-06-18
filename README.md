@@ -12,33 +12,6 @@
 
 ---
 
-## الخطوة 1 — رفع الملفات على GitHub Pages (مجاني)
-
-1. اذهب إلى [github.com](https://github.com) وسجّل دخولك
-2. اضغط **New repository** → اسمه: `deutsch-lernen`
-3. اجعله **Public** ✓
-4. اضغط **Create repository**
-5. ارفع الملفات الخمسة كلها (اسحبها أو Upload files)
-6. **أهم خطوة:** احرص على أن اسم الملف الرئيسي هو `index.html`
-7. اذهب إلى **Settings** → **Pages** → Source: **Deploy from branch** → branch: **main** → **Save**
-8. انتظر دقيقة → رابطك سيكون: `https://اسم-المستخدم.github.io/deutsch-lernen/`
-
----
-
-## الخطوة 2 — تثبيت التطبيق على iPhone
-
-### على iPhone 11 → 17 (iOS 14+):
-
-1. افتح **Safari** (ليس Chrome أو Firefox)
-2. اكتب رابط GitHub Pages الخاص بك
-3. اضغط زر **المشاركة** ⬆️ (Share) في أسفل الشاشة
-4. اختر **"Add to Home Screen"** (إضافة إلى الشاشة الرئيسية)
-5. اضغط **Add**
-
-✅ ستظهر أيقونة التطبيق على شاشتك الرئيسية تماماً كأي تطبيق عادي!
-
----
-
 ## المزايا بعد التثبيت
 
 | الميزة | التفاصيل |
